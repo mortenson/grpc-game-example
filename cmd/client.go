@@ -73,6 +73,7 @@ func main() {
 		}
 		return 0, 0, 0, 0
 	})
+	// Handle player movement input.
 	box.SetInputCapture(func(e *tcell.EventKey) *tcell.EventKey {
 		currentPlayer.Mux.Lock()
 		switch e.Key() {
@@ -89,6 +90,14 @@ func main() {
 		return e
 	})
 	app := tview.NewApplication()
+	// Main loop - re-draw at ~60 FPS.
+	go func() {
+		for {
+			app.Draw()
+			time.Sleep(17 * time.Microsecond)
+		}
+	}()
+	// Update player position based on requested direction.
 	go func() {
 		for {
 			for _, player := range game.Players {
@@ -112,6 +121,18 @@ func main() {
 				player.LastMove = time.Now()
 				player.Mux.Unlock()
 			}
+		}
+	}()
+	// Random movement.
+	go func() {
+		for {
+			for _, player := range game.Players {
+				if player.Name == "Bob" {
+					player.Position.X -= 1
+					player.Position.Y -= 1
+				}
+			}
+			time.Sleep(time.Second * 1)
 		}
 	}()
 	if err := app.SetRoot(box, true).SetFocus(box).Run(); err != nil {
