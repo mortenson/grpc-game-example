@@ -2,6 +2,7 @@ package main
 
 import (
 	"sync"
+	"time"
 
 	"github.com/gdamore/tcell"
 	"github.com/rivo/tview"
@@ -26,6 +27,7 @@ type Player struct {
 	Position  Coordinate
 	Name      string
 	Direction Direction
+	LastMove  time.Time
 	Icon      rune
 	Mux       sync.Mutex
 }
@@ -40,6 +42,7 @@ func main() {
 		Name:      "Alice",
 		Icon:      'A',
 		Direction: DirectionStop,
+		LastMove:  time.Time{},
 	}
 	game := Game{Players: []*Player{
 		&currentPlayer,
@@ -48,6 +51,7 @@ func main() {
 			Name:      "Bob",
 			Icon:      'B',
 			Direction: DirectionStop,
+			LastMove:  time.Time{},
 		},
 	}}
 	box := tview.NewBox().SetBorder(true).SetTitle("grpc-game-example")
@@ -58,7 +62,7 @@ func main() {
 		centerX := x + width/2
 		for x := 1; x < width; x++ {
 			for y := 1; y < height; y++ {
-				screen.SetContent(x, y, '.', nil, tcell.StyleDefault.Foreground(tcell.ColorWhite))
+				screen.SetContent(x, y, ' ', nil, tcell.StyleDefault.Foreground(tcell.ColorWhite))
 			}
 		}
 		screen.SetContent(centerX, centerY, 'O', nil, tcell.StyleDefault.Foreground(tcell.ColorWhite))
@@ -70,6 +74,7 @@ func main() {
 		return 0, 0, 0, 0
 	})
 	box.SetInputCapture(func(e *tcell.EventKey) *tcell.EventKey {
+		currentPlayer.Mux.Lock()
 		switch e.Key() {
 		case tcell.KeyUp:
 			currentPlayer.Direction = DirectionUp
@@ -79,15 +84,20 @@ func main() {
 			currentPlayer.Direction = DirectionLeft
 		case tcell.KeyRight:
 			currentPlayer.Direction = DirectionRight
-		default:
-			currentPlayer.Direction = DirectionStop
 		}
+		currentPlayer.Mux.Unlock()
 		return e
 	})
+	app := tview.NewApplication()
 	go func() {
 		for {
 			for _, player := range game.Players {
 				player.Mux.Lock()
+				if player.Direction == DirectionStop || player.LastMove.After(time.Now().Add(-50*time.Millisecond)) {
+					player.Direction = DirectionStop
+					player.Mux.Unlock()
+					continue
+				}
 				switch player.Direction {
 				case DirectionUp:
 					player.Position.Y -= 1
@@ -99,12 +109,11 @@ func main() {
 					player.Position.X += 1
 				}
 				player.Direction = DirectionStop
+				player.LastMove = time.Now()
 				player.Mux.Unlock()
 			}
-			//time.Sleep(1 * time.Second)
 		}
 	}()
-	app := tview.NewApplication()
 	if err := app.SetRoot(box, true).SetFocus(box).Run(); err != nil {
 		panic(err)
 	}
