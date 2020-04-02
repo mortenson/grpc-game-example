@@ -1,0 +1,66 @@
+syntax = "proto3";
+
+package proto;
+
+import "google/protobuf/timestamp.proto";
+
+service Game {
+    rpc Stream (stream Request) returns (stream Response) {}
+}
+
+// Shared message types.
+
+message Coordinate {
+    int32 x = 1;
+    int32 y = 2;
+}
+
+// Connect/disconnect.
+
+message ConnectRequest {
+    string player = 1;
+}
+
+message ConnectResponse {
+    bool success = 1;
+    string error = 2;
+    Coordinate startPosition = 3;
+}
+
+// Movement action.
+
+message MoveRequest {
+    enum Direction {
+        UP = 0;
+        DOWN = 1;
+        LEFT = 2;
+        RIGHT = 3;
+        STOP = 4;
+    }
+    Direction direction = 1;
+    google.protobuf.Timestamp time = 2;
+}
+
+// Indicates a player changed positions.
+
+message ChangePositionResponse {
+    Coordinate position = 1;
+    string player = 2;
+    google.protobuf.Timestamp time = 3;
+}
+
+// Wraps multiple message types.
+
+message Request {
+    oneof message {
+        ConnectRequest connect = 2;
+        MoveRequest move = 3;
+    }
+}
+
+message Response {
+    oneof message {
+        ConnectResponse connect = 1;
+        ChangePositionResponse change_position = 2;
+    }
+}
