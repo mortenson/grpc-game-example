@@ -27,7 +27,6 @@ type Player struct {
 	Position  Coordinate
 	Name      string
 	Direction Direction
-	LastMove  time.Time
 	Icon      rune
 	Mux       sync.Mutex
 }
@@ -42,7 +41,6 @@ func main() {
 		Name:      "Alice",
 		Icon:      'A',
 		Direction: DirectionStop,
-		LastMove:  time.Time{},
 	}
 	game := Game{Players: []*Player{
 		&currentPlayer,
@@ -51,7 +49,6 @@ func main() {
 			Name:      "Bob",
 			Icon:      'B',
 			Direction: DirectionStop,
-			LastMove:  time.Time{},
 		},
 	}}
 	box := tview.NewBox().SetBorder(true).SetTitle("grpc-game-example")
@@ -99,10 +96,11 @@ func main() {
 	}()
 	// Update player position based on requested direction.
 	go func() {
+		lastmove := map[string]time.Time{}
 		for {
 			for _, player := range game.Players {
 				player.Mux.Lock()
-				if player.Direction == DirectionStop || player.LastMove.After(time.Now().Add(-50*time.Millisecond)) {
+				if player.Direction == DirectionStop || lastmove[player.Name].After(time.Now().Add(-50*time.Millisecond)) {
 					player.Direction = DirectionStop
 					player.Mux.Unlock()
 					continue
@@ -118,7 +116,7 @@ func main() {
 					player.Position.X += 1
 				}
 				player.Direction = DirectionStop
-				player.LastMove = time.Now()
+				lastmove[player.Name] = time.Now()
 				player.Mux.Unlock()
 			}
 		}
