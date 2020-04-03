@@ -44,7 +44,7 @@ func main() {
 	}
 	game := Game{Players: []*Player{
 		&currentPlayer,
-		&Player{
+		{
 			Position:  Coordinate{X: 10, Y: 10},
 			Name:      "Bob",
 			Icon:      'B',
