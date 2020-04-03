@@ -26,6 +26,7 @@ github.com/lucasb-eyer/go-colorful v1.0.3/go.mod h1:R4dSotOR9KMtayYi1e77YzuveK+i
 github.com/mattn/go-runewidth v0.0.4/go.mod h1:LwmH8dsx7+W8Uxz3IHJYH5QSwggIsqBzpuz5H//U1FU=
 github.com/mattn/go-runewidth v0.0.8 h1:3tS41NlGYSmhhe/8fhGRzc+z3AYCw1Fe1WAyLuujKs0=
 github.com/mattn/go-runewidth v0.0.8/go.mod h1:H031xJmbD/WCDINGzjvQ9THkh0rPKHF+m2gUSrubnMI=
+github.com/pahanini/go-grpc-bidirectional-streaming-example v0.0.0-20200211082650-15e38ec131f2 h1:F1YAsCmBdmyiF+GJJoB0aziFMgkznIWDZlkqxTzoooQ=
 github.com/prometheus/client_model v0.0.0-20190812154241-14fe0d1b01d4/go.mod h1:xMI15A0UPsDsEKsMN9yxemIoYk6Tm2C1GtYGdfGttqA=
 github.com/rivo/tview v0.0.0-20200329194346-7cc182c5846e h1:UBMir07DVOqNx4UszYf4Eh5PJSuE98hhOLMPP5vOhcI=
 github.com/rivo/tview v0.0.0-20200329194346-7cc182c5846e/go.mod h1:6lkG1x+13OShEf0EaOCaTQYyB7d5nSbb181KtjlS+84=

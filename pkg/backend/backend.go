@@ -29,7 +29,8 @@ type Player struct {
 }
 
 type Game struct {
-	Players []*Player
+	Players       []*Player
+	CurrentPlayer *Player
 }
 
 func NewGame() Game {
