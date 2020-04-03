@@ -5,7 +5,7 @@ package proto;
 //import "google/protobuf/timestamp.proto";
 
 service Game {
-    rpc Stream (stream Message) returns (stream Message) {}
+    rpc Stream (stream Request) returns (stream Response) {}
 }
 
 // Shared message types.
@@ -15,15 +15,13 @@ message Coordinate {
     int32 y = 2;
 }
 
-// Connect/disconnect.
-
-message Connect {}
-
-message Initialize {
-    Coordinate startPosition = 1;
+message Connect {
+    string player = 1;
 }
 
-// Movement action.
+message Initialize {
+    Coordinate position = 1;
+}
 
 message Move {
     enum Direction {
@@ -36,13 +34,29 @@ message Move {
     Direction direction = 1;
 }
 
+message AddPlayer {
+    Coordinate position = 1;
+}
+
+message UpdatePlayer {
+    Coordinate position = 1;
+}
+
+message RemovePlayer {}
+
 // Wraps multiple message types.
 
-message Message {
+message Request {
+    oneof action {
+        Connect connect = 1;
+        Move move = 2;
+    }
+}
+
+message Response {
     string player = 1;
     oneof action {
-        Connect connect = 2;
-        Move move = 3;
-        Initialize initialize = 4;
+        Move move = 2;
+        Initialize initialize = 3;
     }
 }

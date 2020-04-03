@@ -1,6 +1,8 @@
-.PHONY: run-client run-server proto fmt
+.PHONY: run-client run-client-local run-server proto fmt
 run-client:
 	go run cmd/client.go
+run-client-local:
+	go run cmd/client_local.go
 run-server:
 	go run cmd/server.go
 proto:

@@ -29,12 +29,14 @@ type Player struct {
 }
 
 type Game struct {
-	Players       []*Player
-	CurrentPlayer *Player
+	Players map[string]*Player
+	Mux     sync.Mutex
 }
 
 func NewGame() Game {
-	game := Game{}
+	game := Game{
+		Players: make(map[string]*Player),
+	}
 	return game
 }
 
@@ -42,9 +44,10 @@ func (game *Game) Start() {
 	go func() {
 		lastmove := map[string]time.Time{}
 		for {
-			for _, player := range game.Players {
+			game.Mux.Lock()
+			for name, player := range game.Players {
 				player.Mux.Lock()
-				if player.Direction == DirectionStop || lastmove[player.Name].After(time.Now().Add(-50*time.Millisecond)) {
+				if player.Direction == DirectionStop || lastmove[name].After(time.Now().Add(-50*time.Millisecond)) {
 					player.Direction = DirectionStop
 					player.Mux.Unlock()
 					continue
@@ -60,9 +63,10 @@ func (game *Game) Start() {
 					player.Position.X++
 				}
 				player.Direction = DirectionStop
-				lastmove[player.Name] = time.Now()
+				lastmove[name] = time.Now()
 				player.Mux.Unlock()
 			}
+			game.Mux.Unlock()
 		}
 	}()
 }
