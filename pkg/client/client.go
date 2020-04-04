@@ -72,6 +72,59 @@ func (c *GameClient) Connect(playerName string) {
 	c.Stream.Send(&req)
 }
 
+func (c *GameClient) HandleInitialize(resp *proto.Response) {
+	init := resp.GetInitialize()
+	if init == nil {
+		// @todo error
+	}
+	c.Game.Mux.Lock()
+	c.CurrentPlayer.Position.X = init.Position.X
+	c.CurrentPlayer.Position.Y = init.Position.Y
+	c.Game.Players[c.CurrentPlayer.Name] = c.CurrentPlayer
+	for _, player := range init.Players {
+		c.Game.Players[player.Player] = &backend.Player{
+			Position: backend.Coordinate{
+				X: player.Position.X,
+				Y: player.Position.Y,
+			},
+			Name:      player.Player,
+			Direction: backend.DirectionStop,
+			Icon:      'P',
+		}
+	}
+	c.Game.Mux.Unlock()
+	c.View.CurrentPlayer = c.CurrentPlayer
+}
+
+func (c *GameClient) HandleAddPlayer(resp *proto.Response) {
+	add := resp.GetAddplayer()
+	if add == nil {
+		// @todo error
+	}
+	newPlayer := backend.Player{
+		Position: backend.Coordinate{
+			X: add.Position.X,
+			Y: add.Position.Y,
+		},
+		Name:      resp.Player,
+		Direction: backend.DirectionStop,
+		Icon:      'P',
+	}
+	c.Game.Mux.Lock()
+	c.Game.Players[resp.Player] = &newPlayer
+	c.Game.Mux.Unlock()
+}
+
+func (c *GameClient) HandleUpdatePlayer(resp *proto.Response) {
+	update := resp.GetUpdateplayer()
+	if update != nil && c.Game.Players[resp.Player] != nil {
+		c.Game.Players[resp.Player].Mux.Lock()
+		c.Game.Players[resp.Player].Position.X = update.Position.X
+		c.Game.Players[resp.Player].Position.Y = update.Position.Y
+		c.Game.Players[resp.Player].Mux.Unlock()
+	}
+}
+
 func (c *GameClient) Start() {
 	go func() {
 		for {
@@ -83,47 +136,14 @@ func (c *GameClient) Start() {
 			if err != nil {
 				log.Fatalf("can not receive %v", err)
 			}
-			init := resp.GetInitialize()
-			if init != nil {
-				c.Game.Mux.Lock()
-				c.CurrentPlayer.Position.X = init.Position.X
-				c.CurrentPlayer.Position.Y = init.Position.Y
-				c.Game.Players[c.CurrentPlayer.Name] = c.CurrentPlayer
-				for _, player := range init.Players {
-					c.Game.Players[player.Player] = &backend.Player{
-						Position: backend.Coordinate{
-							X: player.Position.X,
-							Y: player.Position.Y,
-						},
-						Name:      player.Player,
-						Direction: backend.DirectionStop,
-						Icon:      'P',
-					}
-				}
-				c.Game.Mux.Unlock()
-				c.View.CurrentPlayer = c.CurrentPlayer
-			}
-			add := resp.GetAddplayer()
-			if add != nil {
-				newPlayer := backend.Player{
-					Position: backend.Coordinate{
-						X: add.Position.X,
-						Y: add.Position.Y,
-					},
-					Name:      resp.Player,
-					Direction: backend.DirectionStop,
-					Icon:      'P',
-				}
-				c.Game.Mux.Lock()
-				c.Game.Players[resp.Player] = &newPlayer
-				c.Game.Mux.Unlock()
-			}
-			update := resp.GetUpdateplayer()
-			if update != nil && c.Game.Players[resp.Player] != nil {
-				c.Game.Players[resp.Player].Mux.Lock()
-				c.Game.Players[resp.Player].Position.X = update.Position.X
-				c.Game.Players[resp.Player].Position.Y = update.Position.Y
-				c.Game.Players[resp.Player].Mux.Unlock()
+
+			switch resp.GetAction().(type) {
+			case *proto.Response_Initialize:
+				c.HandleInitialize(resp)
+			case *proto.Response_Addplayer:
+				c.HandleAddPlayer(resp)
+			case *proto.Response_Updateplayer:
+				c.HandleUpdatePlayer(resp)
 			}
 		}
 	}()
