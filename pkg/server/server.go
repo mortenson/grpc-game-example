@@ -144,19 +144,30 @@ func (s GameServer) Stream(srv proto.Game_StreamServer) error {
 	}
 }
 
+func (s GameServer) WatchChanges() {
+	go func() {
+		for {
+			change := <-s.Game.ChangeChannel
+			switch change.(type) {
+			case backend.PositionChange:
+				change := change.(backend.PositionChange)
+				resp := proto.Response{
+					Player: change.PlayerName,
+					Action: &proto.Response_Updateplayer{
+						Updateplayer: &proto.UpdatePlayer{
+							Position: &proto.Coordinate{X: int32(change.Position.X), Y: int32(change.Position.Y)},
+						},
+					},
+				}
+				log.Printf("update %s with %v", change.PlayerName, resp)
+				s.Broadcast(&resp)
+			}
+		}
+	}()
+}
+
 func NewGameServer(game *backend.Game) *GameServer {
 	server := &GameServer{Game: game, Clients: make(map[string]*client)}
-	game.OnPositionChange = func(player *backend.Player) {
-		resp := proto.Response{
-			Player: player.Name,
-			Action: &proto.Response_Updateplayer{
-				Updateplayer: &proto.UpdatePlayer{
-					Position: &proto.Coordinate{X: int32(player.Position.X), Y: int32(player.Position.Y)},
-				},
-			},
-		}
-		log.Printf("update %s", player.Name)
-		server.Broadcast(&resp)
-	}
+	server.WatchChanges()
 	return server
 }

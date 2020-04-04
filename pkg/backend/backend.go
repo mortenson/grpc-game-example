@@ -30,6 +30,12 @@ type MoveAction struct {
 	Direction  Direction
 }
 
+type PositionChange struct {
+	PlayerName string
+	Direction  Direction
+	Position   Coordinate
+}
+
 type Player struct {
 	Position Coordinate
 	Name     string
@@ -38,11 +44,11 @@ type Player struct {
 }
 
 type Game struct {
-	Players          map[string]*Player
-	Mux              sync.Mutex
-	OnPositionChange func(*Player)
-	ActionChannel    chan Action
-	LastAction       map[string]time.Time
+	Players       map[string]*Player
+	Mux           sync.Mutex
+	ChangeChannel chan interface{}
+	ActionChannel chan Action
+	LastAction    map[string]time.Time
 }
 
 func (action MoveAction) Perform(game *Game) {
@@ -68,11 +74,13 @@ func (action MoveAction) Perform(game *Game) {
 	case DirectionRight:
 		player.Position.X++
 	}
-	player.Mux.Unlock()
 	game.LastAction[actionKey] = time.Now()
-	if game.OnPositionChange != nil {
-		game.OnPositionChange(player)
+	game.ChangeChannel <- PositionChange{
+		PlayerName: player.Name,
+		Direction:  action.Direction,
+		Position:   player.Position,
 	}
+	player.Mux.Unlock()
 }
 
 func NewGame() Game {
@@ -80,6 +88,7 @@ func NewGame() Game {
 		Players:       make(map[string]*Player),
 		ActionChannel: make(chan Action, 1),
 		LastAction:    make(map[string]time.Time),
+		ChangeChannel: make(chan interface{}, 1),
 	}
 	return game
 }

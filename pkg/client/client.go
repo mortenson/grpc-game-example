@@ -27,33 +27,42 @@ func NewGameClient(conn grpc.ClientConnInterface, game *backend.Game, view *fron
 		log.Fatalf("openn stream error %v", err)
 	}
 
-	view.OnDirectionChange = func(player *backend.Player) {
-		direction := proto.Move_STOP
-		switch player.Direction {
-		case backend.DirectionUp:
-			direction = proto.Move_UP
-		case backend.DirectionDown:
-			direction = proto.Move_DOWN
-		case backend.DirectionLeft:
-			direction = proto.Move_LEFT
-		case backend.DirectionRight:
-			direction = proto.Move_RIGHT
-		}
-		req := proto.Request{
-			Action: &proto.Request_Move{
-				Move: &proto.Move{
-					Direction: direction,
-				},
-			},
-		}
-		stream.Send(&req)
-	}
-
 	return &GameClient{
 		Stream: stream,
 		Game:   game,
 		View:   view,
 	}
+}
+
+func (c *GameClient) WatchChanges() {
+	go func() {
+		for {
+			change := <-c.Game.ChangeChannel
+			switch change.(type) {
+			case backend.PositionChange:
+				change := change.(backend.PositionChange)
+				direction := proto.Move_STOP
+				switch change.Direction {
+				case backend.DirectionUp:
+					direction = proto.Move_UP
+				case backend.DirectionDown:
+					direction = proto.Move_DOWN
+				case backend.DirectionLeft:
+					direction = proto.Move_LEFT
+				case backend.DirectionRight:
+					direction = proto.Move_RIGHT
+				}
+				req := proto.Request{
+					Action: &proto.Request_Move{
+						Move: &proto.Move{
+							Direction: direction,
+						},
+					},
+				}
+				c.Stream.Send(&req)
+			}
+		}
+	}()
 }
 
 func (c *GameClient) Connect(playerName string) {
@@ -123,6 +132,7 @@ func (c *GameClient) HandleUpdatePlayer(resp *proto.Response) {
 }
 
 func (c *GameClient) Start() {
+	c.WatchChanges()
 	go func() {
 		for {
 			resp, err := c.Stream.Recv()
