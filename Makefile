@@ -8,4 +8,4 @@ run-server:
 proto:
 	protoc --go_out=plugins=grpc:. proto/*.proto
 fmt:
-	gofmt -s -w cmd/*.go proto/*.go
+	gofmt -s -w cmd/*.go proto/*.go pkg/*/*.go
