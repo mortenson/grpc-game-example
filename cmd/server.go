@@ -4,6 +4,7 @@ import (
 	"io"
 	"log"
 	"net"
+	"sync"
 
 	"github.com/mortenson/grpc-game-example/pkg/backend"
 	"github.com/mortenson/grpc-game-example/proto"
@@ -11,14 +12,32 @@ import (
 	"google.golang.org/grpc"
 )
 
+type client struct {
+	StreamServer proto.Game_StreamServer
+}
+
 type server struct {
 	proto.UnimplementedGameServer
-	Game *backend.Game
+	Game    *backend.Game
+	Clients map[string]*client
+	Mux     sync.Mutex
+}
+
+func (s server) Broadcast(resp *proto.Response) {
+	s.Mux.Lock()
+	for name, client := range s.Clients {
+		if err := client.StreamServer.Send(resp); err != nil {
+			log.Printf("broadcast error %v", err)
+		}
+		log.Printf("broadcasted message to %s", name)
+	}
+	s.Mux.Unlock()
 }
 
 func (s server) Stream(srv proto.Game_StreamServer) error {
 	log.Println("start new server")
 	ctx := srv.Context()
+	currentPlayer := ""
 	for {
 		select {
 		case <-ctx.Done():
@@ -37,12 +56,12 @@ func (s server) Stream(srv proto.Game_StreamServer) error {
 		}
 
 		connect := req.GetConnect()
-		player := connect.GetPlayer()
-		if connect != nil && player != "" {
+		if connect != nil && connect.GetPlayer() != "" {
+			currentPlayer = connect.GetPlayer()
 			s.Game.Mux.Lock()
-			s.Game.Players[player] = &backend.Player{
+			s.Game.Players[currentPlayer] = &backend.Player{
 				Position:  backend.Coordinate{X: 10, Y: 10},
-				Name:      player,
+				Name:      currentPlayer,
 				Direction: backend.DirectionStop,
 				Icon:      'P',
 			}
@@ -54,10 +73,44 @@ func (s server) Stream(srv proto.Game_StreamServer) error {
 					},
 				},
 			}
+			s.Mux.Lock()
+			s.Clients[currentPlayer] = &client{
+				StreamServer: srv,
+			}
 			if err := srv.Send(&resp); err != nil {
 				log.Printf("send error %v", err)
 			}
 			log.Printf("sent initialize message")
+
+			resp = proto.Response{
+				Action: &proto.Response_Addplayer{
+					Addplayer: &proto.AddPlayer{
+						Position: &proto.Coordinate{X: 10, Y: 10},
+					},
+				},
+			}
+			s.Broadcast(&resp)
+		}
+
+		if currentPlayer == "" {
+			continue
+		}
+
+		move := req.GetMove()
+		if move != nil {
+			s.Game.Mux.Lock()
+			switch move.Direction {
+			case proto.Move_UP:
+				s.Game.Players[currentPlayer].Direction = backend.DirectionUp
+			case proto.Move_DOWN:
+				s.Game.Players[currentPlayer].Direction = backend.DirectionDown
+			case proto.Move_LEFT:
+				s.Game.Players[currentPlayer].Direction = backend.DirectionLeft
+			case proto.Move_RIGHT:
+				s.Game.Players[currentPlayer].Direction = backend.DirectionRight
+			case proto.Move_STOP:
+				s.Game.Players[currentPlayer].Direction = backend.DirectionStop
+			}
 		}
 	}
 }
@@ -71,7 +124,8 @@ func main() {
 	game := backend.NewGame()
 	game.Start()
 	s := grpc.NewServer()
-	proto.RegisterGameServer(s, server{Game: &game})
+	server := &server{Game: &game, Clients: make(map[string]*client)}
+	proto.RegisterGameServer(s, server)
 
 	if err := s.Serve(lis); err != nil {
 		log.Fatalf("failed to serve: %v", err)

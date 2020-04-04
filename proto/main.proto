@@ -58,5 +58,8 @@ message Response {
     oneof action {
         Move move = 2;
         Initialize initialize = 3;
+        AddPlayer addplayer = 4;
+        UpdatePlayer updateplayer = 5;
+        RemovePlayer removeplayer = 6;
     }
 }
