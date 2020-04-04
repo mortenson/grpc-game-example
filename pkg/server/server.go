@@ -46,10 +46,9 @@ func (s GameServer) HandleConnect(req *proto.Request, srv proto.Game_StreamServe
 		})
 	}
 	s.Game.Players[currentPlayer] = &backend.Player{
-		Position:  backend.Coordinate{X: 10, Y: 10},
-		Name:      currentPlayer,
-		Direction: backend.DirectionStop,
-		Icon:      'P',
+		Position: backend.Coordinate{X: 10, Y: 10},
+		Name:     currentPlayer,
+		Icon:     'P',
 	}
 	s.Game.Mux.Unlock()
 
@@ -91,17 +90,20 @@ func (s GameServer) HandleMove(currentPlayer string, req *proto.Request, srv pro
 		// @todo error
 	}
 	s.Game.Mux.Lock()
+	direction := backend.DirectionStop
 	switch move.Direction {
 	case proto.Move_UP:
-		s.Game.Players[currentPlayer].Direction = backend.DirectionUp
+		direction = backend.DirectionUp
 	case proto.Move_DOWN:
-		s.Game.Players[currentPlayer].Direction = backend.DirectionDown
+		direction = backend.DirectionDown
 	case proto.Move_LEFT:
-		s.Game.Players[currentPlayer].Direction = backend.DirectionLeft
+		direction = backend.DirectionLeft
 	case proto.Move_RIGHT:
-		s.Game.Players[currentPlayer].Direction = backend.DirectionRight
-	case proto.Move_STOP:
-		s.Game.Players[currentPlayer].Direction = backend.DirectionStop
+		direction = backend.DirectionRight
+	}
+	s.Game.ActionChannel <- backend.MoveAction{
+		PlayerName: currentPlayer,
+		Direction:  direction,
 	}
 	s.Game.Mux.Unlock()
 }

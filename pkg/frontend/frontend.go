@@ -45,21 +45,26 @@ func NewView(game *backend.Game) *View {
 		if view.CurrentPlayer == nil {
 			return e
 		}
-		view.CurrentPlayer.Mux.Lock()
+		direction := backend.DirectionStop
 		switch e.Key() {
 		case tcell.KeyUp:
-			view.CurrentPlayer.Direction = backend.DirectionUp
+			direction = backend.DirectionUp
 		case tcell.KeyDown:
-			view.CurrentPlayer.Direction = backend.DirectionDown
+			direction = backend.DirectionDown
 		case tcell.KeyLeft:
-			view.CurrentPlayer.Direction = backend.DirectionLeft
+			direction = backend.DirectionLeft
 		case tcell.KeyRight:
-			view.CurrentPlayer.Direction = backend.DirectionRight
+			direction = backend.DirectionRight
 		}
-		if view.CurrentPlayer.Direction != backend.DirectionStop && view.OnDirectionChange != nil {
-			view.OnDirectionChange(view.CurrentPlayer)
+		if direction != backend.DirectionStop {
+			game.ActionChannel <- backend.MoveAction{
+				PlayerName: view.CurrentPlayer.Name,
+				Direction:  direction,
+			}
+			if view.OnDirectionChange != nil {
+				view.OnDirectionChange(view.CurrentPlayer)
+			}
 		}
-		view.CurrentPlayer.Mux.Unlock()
 		return e
 	})
 	app.SetRoot(box, true).SetFocus(box)

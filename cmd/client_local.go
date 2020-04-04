@@ -7,10 +7,9 @@ import (
 
 func main() {
 	currentPlayer := backend.Player{
-		Position:  backend.Coordinate{X: -1, Y: -5},
-		Name:      "Alice",
-		Icon:      'A',
-		Direction: backend.DirectionStop,
+		Position: backend.Coordinate{X: -1, Y: -5},
+		Name:     "Alice",
+		Icon:     'A',
 	}
 	game := backend.NewGame()
 	game.Players[currentPlayer.Name] = &currentPlayer

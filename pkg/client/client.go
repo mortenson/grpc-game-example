@@ -58,9 +58,8 @@ func NewGameClient(conn grpc.ClientConnInterface, game *backend.Game, view *fron
 
 func (c *GameClient) Connect(playerName string) {
 	c.CurrentPlayer = &backend.Player{
-		Name:      playerName,
-		Direction: backend.DirectionStop,
-		Icon:      'P',
+		Name: playerName,
+		Icon: 'P',
 	}
 	req := proto.Request{
 		Action: &proto.Request_Connect{
@@ -87,9 +86,8 @@ func (c *GameClient) HandleInitialize(resp *proto.Response) {
 				X: int(player.Position.X),
 				Y: int(player.Position.Y),
 			},
-			Name:      player.Player,
-			Direction: backend.DirectionStop,
-			Icon:      'P',
+			Name: player.Player,
+			Icon: 'P',
 		}
 	}
 	c.Game.Mux.Unlock()
@@ -106,9 +104,8 @@ func (c *GameClient) HandleAddPlayer(resp *proto.Response) {
 			X: int(add.Position.X),
 			Y: int(add.Position.Y),
 		},
-		Name:      resp.Player,
-		Direction: backend.DirectionStop,
-		Icon:      'P',
+		Name: resp.Player,
+		Icon: 'P',
 	}
 	c.Game.Mux.Lock()
 	c.Game.Players[resp.Player] = &newPlayer
