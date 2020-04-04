@@ -6,8 +6,8 @@ import (
 )
 
 type Coordinate struct {
-	X int
-	Y int
+	X int32
+	Y int32
 }
 
 type Direction int32

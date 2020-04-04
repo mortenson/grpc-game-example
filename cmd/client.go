@@ -66,8 +66,8 @@ func main() {
 			if init != nil {
 				currentPlayer := backend.Player{
 					Position: backend.Coordinate{
-						X: int(init.Position.X),
-						Y: int(init.Position.Y),
+						X: init.Position.X,
+						Y: init.Position.Y,
 					},
 					Name:      playerName,
 					Direction: backend.DirectionStop,
@@ -75,6 +75,17 @@ func main() {
 				}
 				game.Mux.Lock()
 				game.Players[playerName] = &currentPlayer
+				for _, player := range init.Players {
+					game.Players[player.Player] = &backend.Player{
+						Position: backend.Coordinate{
+							X: player.Position.X,
+							Y: player.Position.Y,
+						},
+						Name:      player.Player,
+						Direction: backend.DirectionStop,
+						Icon:      'P',
+					}
+				}
 				game.Mux.Unlock()
 				view.CurrentPlayer = &currentPlayer
 			}
@@ -82,8 +93,8 @@ func main() {
 			if add != nil {
 				newPlayer := backend.Player{
 					Position: backend.Coordinate{
-						X: int(add.Position.X),
-						Y: int(add.Position.Y),
+						X: add.Position.X,
+						Y: add.Position.Y,
 					},
 					Name:      resp.Player,
 					Direction: backend.DirectionStop,
@@ -96,8 +107,8 @@ func main() {
 			update := resp.GetUpdateplayer()
 			if update != nil && game.Players[resp.Player] != nil {
 				game.Players[resp.Player].Mux.Lock()
-				game.Players[resp.Player].Position.X = int(update.Position.X)
-				game.Players[resp.Player].Position.Y = int(update.Position.Y)
+				game.Players[resp.Player].Position.X = update.Position.X
+				game.Players[resp.Player].Position.Y = update.Position.Y
 				game.Players[resp.Player].Mux.Unlock()
 			}
 		}

@@ -59,6 +59,13 @@ func (s server) Stream(srv proto.Game_StreamServer) error {
 		if connect != nil && connect.GetPlayer() != "" {
 			currentPlayer = connect.GetPlayer()
 			s.Game.Mux.Lock()
+			players := make([]*proto.Player, 0)
+			for _, player := range s.Game.Players {
+				players = append(players, &proto.Player{
+					Player:   player.Name,
+					Position: &proto.Coordinate{X: player.Position.X, Y: player.Position.Y},
+				})
+			}
 			s.Game.Players[currentPlayer] = &backend.Player{
 				Position:  backend.Coordinate{X: 10, Y: 10},
 				Name:      currentPlayer,
@@ -66,10 +73,12 @@ func (s server) Stream(srv proto.Game_StreamServer) error {
 				Icon:      'P',
 			}
 			s.Game.Mux.Unlock()
+
 			resp := proto.Response{
 				Action: &proto.Response_Initialize{
 					Initialize: &proto.Initialize{
 						Position: &proto.Coordinate{X: 10, Y: 10},
+						Players:  players,
 					},
 				},
 			}
@@ -137,7 +146,7 @@ func main() {
 			Player: player.Name,
 			Action: &proto.Response_Updateplayer{
 				Updateplayer: &proto.UpdatePlayer{
-					Position: &proto.Coordinate{X: int32(player.Position.X), Y: int32(player.Position.Y)},
+					Position: &proto.Coordinate{X: player.Position.X, Y: player.Position.Y},
 				},
 			},
 		}
