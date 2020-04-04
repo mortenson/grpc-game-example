@@ -4,6 +4,8 @@ import (
 	"context"
 	"io"
 	"log"
+	"math/rand"
+	"time"
 
 	"github.com/mortenson/grpc-game-example/pkg/backend"
 	"github.com/mortenson/grpc-game-example/pkg/frontend"
@@ -11,12 +13,23 @@ import (
 	"google.golang.org/grpc"
 )
 
+var letters = []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")
+
+func randSeq(n int) string {
+	rand.Seed(time.Now().Unix())
+	b := make([]rune, n)
+	for i := range b {
+		b[i] = letters[rand.Intn(len(letters))]
+	}
+	return string(b)
+}
+
 func main() {
 	game := backend.NewGame()
 	view := frontend.NewView(&game)
 	game.Start()
 
-	playerName := "Bob"
+	playerName := randSeq(6)
 
 	conn, err := grpc.Dial(":8888", grpc.WithInsecure())
 	if err != nil {
@@ -36,6 +49,7 @@ func main() {
 		},
 	}
 	stream.Send(&req)
+	// @todo
 	//ctx := stream.Context()
 
 	go func() {
@@ -64,8 +78,52 @@ func main() {
 				game.Mux.Unlock()
 				view.CurrentPlayer = &currentPlayer
 			}
+			add := resp.GetAddplayer()
+			if add != nil {
+				newPlayer := backend.Player{
+					Position: backend.Coordinate{
+						X: int(add.Position.X),
+						Y: int(add.Position.Y),
+					},
+					Name:      resp.Player,
+					Direction: backend.DirectionStop,
+					Icon:      'P',
+				}
+				game.Mux.Lock()
+				game.Players[resp.Player] = &newPlayer
+				game.Mux.Unlock()
+			}
+			update := resp.GetUpdateplayer()
+			if update != nil && game.Players[resp.Player] != nil {
+				game.Players[resp.Player].Mux.Lock()
+				game.Players[resp.Player].Position.X = int(update.Position.X)
+				game.Players[resp.Player].Position.Y = int(update.Position.Y)
+				game.Players[resp.Player].Mux.Unlock()
+			}
 		}
 	}()
+
+	view.OnDirectionChange = func(player *backend.Player) {
+		direction := proto.Move_STOP
+		switch player.Direction {
+		case backend.DirectionUp:
+			direction = proto.Move_UP
+		case backend.DirectionDown:
+			direction = proto.Move_DOWN
+		case backend.DirectionLeft:
+			direction = proto.Move_LEFT
+		case backend.DirectionRight:
+			direction = proto.Move_RIGHT
+		}
+		req := proto.Request{
+			Action: &proto.Request_Move{
+				Move: &proto.Move{
+					Direction: direction,
+				},
+			},
+		}
+		stream.Send(&req)
+	}
 
 	view.Start()
 }

@@ -56,7 +56,6 @@ message Request {
 message Response {
     string player = 1;
     oneof action {
-        Move move = 2;
         Initialize initialize = 3;
         AddPlayer addplayer = 4;
         UpdatePlayer updateplayer = 5;

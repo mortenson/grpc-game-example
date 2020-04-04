@@ -29,8 +29,9 @@ type Player struct {
 }
 
 type Game struct {
-	Players map[string]*Player
-	Mux     sync.Mutex
+	Players          map[string]*Player
+	Mux              sync.Mutex
+	OnPositionChange func(*Player)
 }
 
 func NewGame() Game {
@@ -64,6 +65,9 @@ func (game *Game) Start() {
 				}
 				player.Direction = DirectionStop
 				lastmove[name] = time.Now()
+				if game.OnPositionChange != nil {
+					game.OnPositionChange(player)
+				}
 				player.Mux.Unlock()
 			}
 			game.Mux.Unlock()

@@ -9,9 +9,10 @@ import (
 )
 
 type View struct {
-	Game          *backend.Game
-	App           *tview.Application
-	CurrentPlayer *backend.Player
+	Game              *backend.Game
+	App               *tview.Application
+	CurrentPlayer     *backend.Player
+	OnDirectionChange func(*backend.Player)
 }
 
 func NewView(game *backend.Game) *View {
@@ -54,6 +55,9 @@ func NewView(game *backend.Game) *View {
 			view.CurrentPlayer.Direction = backend.DirectionLeft
 		case tcell.KeyRight:
 			view.CurrentPlayer.Direction = backend.DirectionRight
+		}
+		if view.CurrentPlayer.Direction != backend.DirectionStop && view.OnDirectionChange != nil {
+			view.OnDirectionChange(view.CurrentPlayer)
 		}
 		view.CurrentPlayer.Mux.Unlock()
 		return e
