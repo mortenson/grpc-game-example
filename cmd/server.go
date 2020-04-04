@@ -5,8 +5,8 @@ import (
 	"net"
 
 	"github.com/mortenson/grpc-game-example/pkg/backend"
+	"github.com/mortenson/grpc-game-example/pkg/server"
 	"github.com/mortenson/grpc-game-example/proto"
-	"github.com/mortenson/grpc-game-example/server"
 
 	"google.golang.org/grpc"
 )

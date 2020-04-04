@@ -42,7 +42,7 @@ func (s GameServer) HandleConnect(req *proto.Request, srv proto.Game_StreamServe
 	for _, player := range s.Game.Players {
 		players = append(players, &proto.Player{
 			Player:   player.Name,
-			Position: &proto.Coordinate{X: player.Position.X, Y: player.Position.Y},
+			Position: &proto.Coordinate{X: int32(player.Position.X), Y: int32(player.Position.Y)},
 		})
 	}
 	s.Game.Players[currentPlayer] = &backend.Player{
@@ -149,7 +149,7 @@ func NewGameServer(game *backend.Game) *GameServer {
 			Player: player.Name,
 			Action: &proto.Response_Updateplayer{
 				Updateplayer: &proto.UpdatePlayer{
-					Position: &proto.Coordinate{X: player.Position.X, Y: player.Position.Y},
+					Position: &proto.Coordinate{X: int32(player.Position.X), Y: int32(player.Position.Y)},
 				},
 			},
 		}

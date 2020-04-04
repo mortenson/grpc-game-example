@@ -35,7 +35,7 @@ func NewView(game *backend.Game) *View {
 		screen.SetContent(centerX, centerY, 'O', nil, tcell.StyleDefault.Foreground(tcell.ColorWhite))
 		for _, player := range game.Players {
 			player.Mux.Lock()
-			screen.SetContent(centerX+int(player.Position.X), centerY+int(player.Position.Y), player.Icon, nil, tcell.StyleDefault.Foreground(tcell.ColorRed))
+			screen.SetContent(centerX+player.Position.X, centerY+player.Position.Y, player.Icon, nil, tcell.StyleDefault.Foreground(tcell.ColorRed))
 			player.Mux.Unlock()
 		}
 		return 0, 0, 0, 0

@@ -78,14 +78,14 @@ func (c *GameClient) HandleInitialize(resp *proto.Response) {
 		// @todo error
 	}
 	c.Game.Mux.Lock()
-	c.CurrentPlayer.Position.X = init.Position.X
-	c.CurrentPlayer.Position.Y = init.Position.Y
+	c.CurrentPlayer.Position.X = int(init.Position.X)
+	c.CurrentPlayer.Position.Y = int(init.Position.Y)
 	c.Game.Players[c.CurrentPlayer.Name] = c.CurrentPlayer
 	for _, player := range init.Players {
 		c.Game.Players[player.Player] = &backend.Player{
 			Position: backend.Coordinate{
-				X: player.Position.X,
-				Y: player.Position.Y,
+				X: int(player.Position.X),
+				Y: int(player.Position.Y),
 			},
 			Name:      player.Player,
 			Direction: backend.DirectionStop,
@@ -103,8 +103,8 @@ func (c *GameClient) HandleAddPlayer(resp *proto.Response) {
 	}
 	newPlayer := backend.Player{
 		Position: backend.Coordinate{
-			X: add.Position.X,
-			Y: add.Position.Y,
+			X: int(add.Position.X),
+			Y: int(add.Position.Y),
 		},
 		Name:      resp.Player,
 		Direction: backend.DirectionStop,
@@ -119,8 +119,8 @@ func (c *GameClient) HandleUpdatePlayer(resp *proto.Response) {
 	update := resp.GetUpdateplayer()
 	if update != nil && c.Game.Players[resp.Player] != nil {
 		c.Game.Players[resp.Player].Mux.Lock()
-		c.Game.Players[resp.Player].Position.X = update.Position.X
-		c.Game.Players[resp.Player].Position.Y = update.Position.Y
+		c.Game.Players[resp.Player].Position.X = int(update.Position.X)
+		c.Game.Players[resp.Player].Position.Y = int(update.Position.Y)
 		c.Game.Players[resp.Player].Mux.Unlock()
 	}
 }
