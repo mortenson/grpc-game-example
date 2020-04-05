@@ -5,14 +5,16 @@ import (
 	"math"
 	"sync"
 	"time"
+
+	"github.com/google/uuid"
 )
 
 // Game is the backend engine for the game. It can be used regardless of how
 // game data is rendered, or if a game server is being used.
 type Game struct {
 	Players       map[string]*Player
-	Lasers        []Laser
-	Mux           sync.Mutex
+	Lasers        map[uuid.UUID]Laser
+	Mux           sync.RWMutex
 	ChangeChannel chan Change
 	ActionChannel chan Action
 	LastAction    map[string]time.Time
@@ -25,6 +27,7 @@ func NewGame() *Game {
 		ActionChannel: make(chan Action, 1),
 		LastAction:    make(map[string]time.Time),
 		ChangeChannel: make(chan Change, 1),
+		Lasers:        make(map[uuid.UUID]Laser),
 	}
 	return &game
 }
@@ -41,8 +44,8 @@ func (game *Game) Start() {
 }
 
 func (game *Game) GetPlayer(playerName string) *Player {
-	game.Mux.Lock()
-	defer game.Mux.Unlock()
+	game.Mux.RLock()
+	defer game.Mux.RUnlock()
 	player, ok := game.Players[playerName]
 	if !ok {
 		return nil
@@ -87,7 +90,7 @@ type Player struct {
 	Position Coordinate
 	Name     string
 	Icon     rune
-	Mux      sync.Mutex
+	Mux      sync.RWMutex
 }
 
 type Laser struct {
@@ -124,6 +127,12 @@ type PositionChange struct {
 	Position   Coordinate
 }
 
+type LaserChange struct {
+	Change
+	UUID  uuid.UUID
+	Laser Laser
+}
+
 // Action is sent by the client when attempting to change game state. The
 // engine can choose to reject Actions if they are invalid or performed too
 // frequently.
@@ -148,7 +157,6 @@ func (action MoveAction) Perform(game *Game) {
 		return
 	}
 	player.Mux.Lock()
-	defer player.Mux.Unlock()
 	// Move the player.
 	switch action.Direction {
 	case DirectionUp:
@@ -166,6 +174,7 @@ func (action MoveAction) Perform(game *Game) {
 		Direction:  action.Direction,
 		Position:   player.Position,
 	}
+	player.Mux.Unlock()
 	select {
 	case game.ChangeChannel <- change:
 		// no-op.
@@ -189,13 +198,13 @@ func (action LaserAction) Perform(game *Game) {
 	if !game.CheckLastActionTime(actionKey, 500) {
 		return
 	}
-	player.Mux.Lock()
+	player.Mux.RLock()
 	laser := Laser{
 		InitialPosition: player.Position,
 		StartTime:       time.Now(),
 		Direction:       action.Direction,
 	}
-	player.Mux.Unlock()
+	player.Mux.RUnlock()
 	// Initialize the laser to the side of the player.
 	switch action.Direction {
 	case DirectionUp:
@@ -208,18 +217,18 @@ func (action LaserAction) Perform(game *Game) {
 		laser.InitialPosition.X++
 	}
 	game.Mux.Lock()
-	game.Lasers = append(game.Lasers, laser)
+	laserUUID := uuid.New()
+	game.Lasers[laserUUID] = laser
 	game.Mux.Unlock()
-	/*change := PositionChange{
-		PlayerName: player.Name,
-		Direction:  action.Direction,
-		Position:   player.Position,
+	change := LaserChange{
+		Laser: laser,
+		UUID:  laserUUID,
 	}
 	select {
 	case game.ChangeChannel <- change:
 		// no-op.
 	default:
 		// no-op.
-	}*/
+	}
 	game.UpdateLastActionTime(actionKey)
 }
