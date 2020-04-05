@@ -104,10 +104,16 @@ func (action MoveAction) Perform(game *Game) {
 	// Update the last moved time.
 	game.LastAction[actionKey] = time.Now()
 	// Inform the client that the player moved.
-	game.ChangeChannel <- PositionChange{
+	change := PositionChange{
 		PlayerName: player.Name,
 		Direction:  action.Direction,
 		Position:   player.Position,
+	}
+	select {
+	case game.ChangeChannel <- change:
+		// no-op.
+	default:
+		// no-op.
 	}
 }
 
