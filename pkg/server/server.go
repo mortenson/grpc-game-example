@@ -119,6 +119,23 @@ func (s *GameServer) HandleMoveRequest(currentPlayer string, req *proto.Request,
 	s.Game.Mux.Unlock()
 }
 
+// RemoveClient removes a client from the game, usually in response to a logout
+// or series error.
+func (s *GameServer) RemoveClient(playerName string, srv proto.Game_StreamServer) {
+	delete(s.Clients, playerName)
+	s.Game.Mux.Lock()
+	delete(s.Game.Players, playerName)
+	delete(s.Game.LastAction, playerName)
+	s.Game.Mux.Unlock()
+	resp := proto.Response{
+		Player: playerName,
+		Action: &proto.Response_Removeplayer{
+			Removeplayer: &proto.RemovePlayer{},
+		},
+	}
+	s.Broadcast(&resp)
+}
+
 // Stream is the main loop for dealing with individual players.
 func (s *GameServer) Stream(srv proto.Game_StreamServer) error {
 	log.Println("start new server")
@@ -133,8 +150,10 @@ func (s *GameServer) Stream(srv proto.Game_StreamServer) error {
 
 		req, err := srv.Recv()
 		if err != nil {
-			// @todo Remove client.
 			log.Printf("receive error %v", err)
+			if currentPlayer != "" {
+				s.RemoveClient(currentPlayer, srv)
+			}
 			continue
 		}
 

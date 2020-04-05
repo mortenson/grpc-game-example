@@ -76,6 +76,8 @@ func (c *GameClient) Start() {
 				c.HandleAddPlayerResponse(resp)
 			case *proto.Response_Updateplayer:
 				c.HandleUpdatePlayerResponse(resp)
+			case *proto.Response_Removeplayer:
+				c.HandleRemovePlayerResponse(resp)
 			}
 		}
 	}()
@@ -156,4 +158,12 @@ func (c *GameClient) HandleUpdatePlayerResponse(resp *proto.Response) {
 	c.Game.Players[resp.Player].Position.X = int(update.Position.X)
 	c.Game.Players[resp.Player].Position.Y = int(update.Position.Y)
 	c.Game.Players[resp.Player].Mux.Unlock()
+}
+
+// HandleRemovePlayerResponse removes a player from the game.
+func (c *GameClient) HandleRemovePlayerResponse(resp *proto.Response) {
+	c.Game.Mux.Lock()
+	defer c.Game.Mux.Unlock()
+	delete(c.Game.Players, resp.Player)
+	delete(c.Game.LastAction, resp.Player)
 }
