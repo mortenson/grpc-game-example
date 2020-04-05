@@ -8,12 +8,14 @@ import (
 	"github.com/rivo/tview"
 )
 
+// View renders the game and handles user interaction.
 type View struct {
 	Game          *backend.Game
 	App           *tview.Application
 	CurrentPlayer *backend.Player
 }
 
+// NewView construsts a new View struct.
 func NewView(game *backend.Game) *View {
 	app := tview.NewApplication()
 	view := &View{
@@ -67,6 +69,7 @@ func NewView(game *backend.Game) *View {
 	return view
 }
 
+// Start starts the frontend game loop.
 func (view *View) Start() error {
 	// Main loop - re-draw at ~60 FPS.
 	go func() {

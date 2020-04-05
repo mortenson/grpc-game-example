@@ -21,7 +21,7 @@ func main() {
 	game.Start()
 
 	s := grpc.NewServer()
-	server := server.NewGameServer(&game)
+	server := server.NewGameServer(game)
 	proto.RegisterGameServer(s, server)
 
 	if err := s.Serve(lis); err != nil {
