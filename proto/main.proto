@@ -20,6 +20,14 @@ message Player {
     Coordinate position = 2;
 }
 
+enum Direction {
+    UP = 0;
+    DOWN = 1;
+    LEFT = 2;
+    RIGHT = 3;
+    STOP = 4;
+}
+
 // Message actions.
 
 message Connect {
@@ -32,24 +40,10 @@ message Initialize {
 }
 
 message Move {
-    enum Direction {
-        UP = 0;
-        DOWN = 1;
-        LEFT = 2;
-        RIGHT = 3;
-        STOP = 4;
-    }
     Direction direction = 1;
 }
 
 message Laser {
-    enum Direction {
-        UP = 0;
-        DOWN = 1;
-        LEFT = 2;
-        RIGHT = 3;
-        STOP = 4;
-    }
     Direction direction = 1;
     string uuid = 2;
 }
