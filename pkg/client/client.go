@@ -133,6 +133,26 @@ func (c *GameClient) HandleInitializeResponse(resp *proto.Response) {
 			Icon: 'P',
 		}
 	}
+	for _, laser := range init.Lasers {
+		laserUUID, err := uuid.Parse(laser.Uuid)
+		if err != nil {
+			// @todo handle
+			continue
+		}
+		starttime, err := ptypes.Timestamp(laser.Starttime)
+		if err != nil {
+			// @todo handle
+			continue
+		}
+		c.Game.Lasers[laserUUID] = backend.Laser{
+			InitialPosition: backend.Coordinate{
+				X: int(laser.Position.X),
+				Y: int(laser.Position.Y),
+			},
+			Direction: proto.GetBackendDirection(laser.Direction),
+			StartTime: starttime,
+		}
+	}
 	c.View.CurrentPlayer = c.CurrentPlayer
 }
 
@@ -186,14 +206,14 @@ func (c *GameClient) HandleAddLaser(resp *proto.Response) {
 		// @todo handle
 		return
 	}
-	startTime, err := ptypes.Timestamp(addLaser.Starttime)
+	startTime, err := ptypes.Timestamp(protoLaser.Starttime)
 	if err != nil {
 		// @todo handle
 		return
 	}
 	c.Game.Mux.Lock()
 	c.Game.Lasers[uuid] = backend.Laser{
-		InitialPosition: backend.Coordinate{X: int(addLaser.Position.X), Y: int(addLaser.Position.Y)},
+		InitialPosition: backend.Coordinate{X: int(protoLaser.Position.X), Y: int(protoLaser.Position.Y)},
 		Direction:       proto.GetBackendDirection(protoLaser.Direction),
 		StartTime:       startTime,
 	}
