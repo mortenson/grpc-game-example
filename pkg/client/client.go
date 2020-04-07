@@ -120,17 +120,13 @@ func (c *GameClient) HandleInitializeResponse(resp *proto.Response) {
 	c.Game.Mux.Lock()
 	defer c.Game.Mux.Unlock()
 	init := resp.GetInitialize()
-	c.CurrentPlayer.Position.X = int(init.Position.X)
-	c.CurrentPlayer.Position.Y = int(init.Position.Y)
+	c.CurrentPlayer.Position = proto.GetBackendCoordinate(init.Position)
 	c.Game.Players[c.CurrentPlayer.Name] = c.CurrentPlayer
 	for _, player := range init.Players {
 		c.Game.Players[player.Player] = &backend.Player{
-			Position: backend.Coordinate{
-				X: int(player.Position.X),
-				Y: int(player.Position.Y),
-			},
-			Name: player.Player,
-			Icon: 'P',
+			Position: proto.GetBackendCoordinate(player.Position),
+			Name:     player.Player,
+			Icon:     'P',
 		}
 	}
 	for _, laser := range init.Lasers {
@@ -145,12 +141,9 @@ func (c *GameClient) HandleInitializeResponse(resp *proto.Response) {
 			continue
 		}
 		c.Game.Lasers[laserUUID] = backend.Laser{
-			InitialPosition: backend.Coordinate{
-				X: int(laser.Position.X),
-				Y: int(laser.Position.Y),
-			},
-			Direction: proto.GetBackendDirection(laser.Direction),
-			StartTime: starttime,
+			InitialPosition: proto.GetBackendCoordinate(laser.Position),
+			Direction:       proto.GetBackendDirection(laser.Direction),
+			StartTime:       starttime,
 		}
 	}
 	c.View.CurrentPlayer = c.CurrentPlayer
@@ -160,12 +153,9 @@ func (c *GameClient) HandleInitializeResponse(resp *proto.Response) {
 func (c *GameClient) HandleAddPlayerResponse(resp *proto.Response) {
 	add := resp.GetAddplayer()
 	newPlayer := backend.Player{
-		Position: backend.Coordinate{
-			X: int(add.Position.X),
-			Y: int(add.Position.Y),
-		},
-		Name: resp.Player,
-		Icon: 'P',
+		Position: proto.GetBackendCoordinate(add.Position),
+		Name:     resp.Player,
+		Icon:     'P',
 	}
 	c.Game.Mux.Lock()
 	c.Game.Players[resp.Player] = &newPlayer
@@ -185,8 +175,7 @@ func (c *GameClient) HandleUpdatePlayerResponse(resp *proto.Response) {
 		return
 	}
 	c.Game.Players[resp.Player].Mux.Lock()
-	c.Game.Players[resp.Player].Position.X = int(update.Position.X)
-	c.Game.Players[resp.Player].Position.Y = int(update.Position.Y)
+	c.Game.Players[resp.Player].Position = proto.GetBackendCoordinate(update.Position)
 	c.Game.Players[resp.Player].Mux.Unlock()
 }
 
@@ -213,7 +202,7 @@ func (c *GameClient) HandleAddLaser(resp *proto.Response) {
 	}
 	c.Game.Mux.Lock()
 	c.Game.Lasers[uuid] = backend.Laser{
-		InitialPosition: backend.Coordinate{X: int(protoLaser.Position.X), Y: int(protoLaser.Position.Y)},
+		InitialPosition: proto.GetBackendCoordinate(protoLaser.Position),
 		Direction:       proto.GetBackendDirection(protoLaser.Direction),
 		StartTime:       startTime,
 	}

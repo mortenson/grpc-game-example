@@ -31,3 +31,17 @@ func GetProtoDirection(direction backend.Direction) Direction {
 	}
 	return protoDirection
 }
+
+func GetBackendCoordinate(protoCoordinate *Coordinate) backend.Coordinate {
+	return backend.Coordinate{
+		X: int(protoCoordinate.X),
+		Y: int(protoCoordinate.Y),
+	}
+}
+
+func GetProtoCoordinate(coordinate backend.Coordinate) *Coordinate {
+	return &Coordinate{
+		X: int32(coordinate.X),
+		Y: int32(coordinate.Y),
+	}
+}
