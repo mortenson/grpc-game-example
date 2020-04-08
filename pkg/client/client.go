@@ -84,7 +84,11 @@ func (c *GameClient) Start() {
 			case *proto.Response_Removeplayer:
 				c.HandleRemovePlayerResponse(resp)
 			case *proto.Response_Addlaser:
-				c.HandleAddLaser(resp)
+				c.HandleAddLaserResponse(resp)
+			case *proto.Response_Removelaser:
+				c.HandleRemoveLaserResponse(resp)
+			case *proto.Response_Playerkilled:
+				c.HandlePlayerKilledResponse(resp)
 			}
 		}
 	}()
@@ -187,7 +191,7 @@ func (c *GameClient) HandleRemovePlayerResponse(resp *proto.Response) {
 	delete(c.Game.LastAction, resp.Player)
 }
 
-func (c *GameClient) HandleAddLaser(resp *proto.Response) {
+func (c *GameClient) HandleAddLaserResponse(resp *proto.Response) {
 	addLaser := resp.GetAddlaser()
 	protoLaser := addLaser.GetLaser()
 	uuid, err := uuid.Parse(protoLaser.Uuid)
@@ -207,4 +211,30 @@ func (c *GameClient) HandleAddLaser(resp *proto.Response) {
 		StartTime:       startTime,
 	}
 	c.Game.Mux.Unlock()
+}
+
+// @todo Does it make sense to sync this over the network? The server already
+// tells us who got hit so local collision detection should remove it anyway.
+func (c *GameClient) HandleRemoveLaserResponse(resp *proto.Response) {
+	removeLaser := resp.GetRemovelaser()
+	uuid, err := uuid.Parse(removeLaser.Uuid)
+	if err != nil {
+		// @todo handle
+		return
+	}
+	c.Game.Mux.Lock()
+	delete(c.Game.Lasers, uuid)
+	c.Game.Mux.Unlock()
+}
+
+func (c *GameClient) HandlePlayerKilledResponse(resp *proto.Response) {
+	playerKilled := resp.GetPlayerkilled()
+	playerName := resp.GetPlayer()
+	if c.Game.Players[playerName] == nil {
+		// @todo handle
+		return
+	}
+	c.Game.Players[playerName].Mux.Lock()
+	c.Game.Players[playerName].Position = proto.GetBackendCoordinate(playerKilled.SpawnPosition)
+	c.Game.Players[playerName].Mux.Unlock()
 }
