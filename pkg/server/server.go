@@ -5,6 +5,7 @@ import (
 	"sync"
 
 	"github.com/golang/protobuf/ptypes"
+	"github.com/google/uuid"
 
 	"github.com/mortenson/grpc-game-example/pkg/backend"
 	"github.com/mortenson/grpc-game-example/proto"
@@ -19,13 +20,13 @@ type client struct {
 type GameServer struct {
 	proto.UnimplementedGameServer
 	Game    *backend.Game
-	Clients map[string]*client
+	Clients map[uuid.UUID]*client
 	Mux     sync.RWMutex
 }
 
 // NewGameServer constructs a new game server struct.
 func NewGameServer(game *backend.Game) *GameServer {
-	server := &GameServer{Game: game, Clients: make(map[string]*client)}
+	server := &GameServer{Game: game, Clients: make(map[uuid.UUID]*client)}
 	server.WatchChanges()
 	return server
 }
@@ -43,35 +44,16 @@ func (s *GameServer) Broadcast(resp *proto.Response) {
 }
 
 // HandleConnectRequest processes new players.
-func (s *GameServer) HandleConnectRequest(req *proto.Request, srv proto.Game_StreamServer) string {
+func (s *GameServer) HandleConnectRequest(req *proto.Request, srv proto.Game_StreamServer) uuid.UUID {
 	connect := req.GetConnect()
-	currentPlayer := connect.GetPlayer()
-	// Build a slice of current players.
-	players := make([]*proto.Player, 0)
-	s.Game.Mux.RLock()
-	for _, player := range s.Game.Players {
-		players = append(players, &proto.Player{
-			Player:   player.Name,
-			Position: proto.GetProtoCoordinate(player.Position),
-		})
-	}
-	// Build a slice of current lasers.
-	lasers := make([]*proto.Laser, 0)
-	for uuid, laser := range s.Game.Lasers {
-		starttime, err := ptypes.TimestampProto(laser.StartTime)
-		if err != nil {
-			// @todo handle
-			continue
+	// Build a slice of current entities.
+	entities := make([]*proto.Entity, 0)
+	for _, entity := range s.Game.Entities {
+		protoEntity := proto.GetProtoEntity(entity)
+		if protoEntity != nil {
+			entities = append(entities, &proto.Entity{Entity: protoEntity})
 		}
-		lasers = append(lasers, &proto.Laser{
-			Direction: proto.GetProtoDirection(laser.Direction),
-			Uuid:      uuid.String(),
-			Starttime: starttime,
-			Position:  proto.GetProtoCoordinate(laser.InitialPosition),
-		})
 	}
-	s.Game.Mux.RUnlock()
-
 	// @todo Choose a start position away from other players?
 	startCoordinate := backend.Coordinate{X: 0, Y: 0}
 
@@ -80,31 +62,41 @@ func (s *GameServer) HandleConnectRequest(req *proto.Request, srv proto.Game_Str
 		Action: &proto.Response_Initialize{
 			Initialize: &proto.Initialize{
 				Position: proto.GetProtoCoordinate(startCoordinate),
-				Players:  players,
-				Lasers:   lasers,
+				Entities: entities,
 			},
 		},
 	}
 	if err := srv.Send(&resp); err != nil {
 		log.Printf("send error %v", err)
 	}
-	log.Printf("sent initialize message for %v", currentPlayer)
+	log.Printf("sent initialize message for %s", connect.Name)
 
 	// Add the new player.
-	s.Game.Mux.Lock()
-	s.Game.Players[currentPlayer] = &backend.Player{
-		Position: startCoordinate,
-		Name:     currentPlayer,
-		Icon:     'P',
+	playerID, err := uuid.Parse(connect.Id)
+	if err != nil {
+		// @todo handle
 	}
-	s.Game.Mux.Unlock()
+	player := &backend.Player{
+		Name:           connect.Name,
+		Icon:           'P',
+		IdentifierBase: backend.IdentifierBase{playerID},
+	}
+	player.Move(startCoordinate)
+	s.Game.AddEntity(player)
 
 	// Inform all other clients of the new player.
 	resp = proto.Response{
-		Player: currentPlayer,
-		Action: &proto.Response_Addplayer{
-			Addplayer: &proto.AddPlayer{
-				Position: proto.GetProtoCoordinate(startCoordinate),
+		Id: connect.Id,
+		Action: &proto.Response_Addentity{
+			Addentity: &proto.AddEntity{
+				Entity: &proto.Entity{
+					Entity: &proto.Entity_Player{
+						Player: &proto.Player{
+							Name:     player.Name,
+							Position: proto.GetProtoCoordinate(player.Position()),
+						},
+					},
+				},
 			},
 		},
 	}
@@ -112,47 +104,44 @@ func (s *GameServer) HandleConnectRequest(req *proto.Request, srv proto.Game_Str
 
 	// Add the new client.
 	s.Mux.Lock()
-	s.Clients[currentPlayer] = &client{
+	s.Clients[player.ID()] = &client{
 		StreamServer: srv,
 	}
 	s.Mux.Unlock()
 
-	// Return the new player name.
-	return currentPlayer
+	// Return the new player ID.
+	return player.ID()
 }
 
 // HandleMoveRequest makes a request to the game engine to move a player.
-func (s *GameServer) HandleMoveRequest(currentPlayer string, req *proto.Request, srv proto.Game_StreamServer) {
+func (s *GameServer) HandleMoveRequest(playerID uuid.UUID, req *proto.Request, srv proto.Game_StreamServer) {
 	move := req.GetMove()
 	s.Game.ActionChannel <- backend.MoveAction{
-		PlayerName: currentPlayer,
-		Direction:  proto.GetBackendDirection(move.Direction),
+		ID:        playerID,
+		Direction: proto.GetBackendDirection(move.Direction),
 	}
 }
 
-func (s *GameServer) HandleLaserRequest(currentPlayer string, req *proto.Request, srv proto.Game_StreamServer) {
+func (s *GameServer) HandleLaserRequest(playerID uuid.UUID, req *proto.Request, srv proto.Game_StreamServer) {
 	move := req.GetLaser()
 	s.Game.ActionChannel <- backend.LaserAction{
-		PlayerName: currentPlayer,
-		Direction:  proto.GetBackendDirection(move.Direction),
+		OwnerID:   playerID,
+		Direction: proto.GetBackendDirection(move.Direction),
 	}
 }
 
 // RemoveClient removes a client from the game, usually in response to a logout
 // or series error.
-func (s *GameServer) RemoveClient(playerName string, srv proto.Game_StreamServer) {
+func (s *GameServer) RemoveClient(playerID uuid.UUID, srv proto.Game_StreamServer) {
 	s.Mux.Lock()
-	delete(s.Clients, playerName)
+	delete(s.Clients, playerID)
 	s.Mux.Unlock()
-	s.Game.Mux.Lock()
-	delete(s.Game.Players, playerName)
-	delete(s.Game.LastAction, playerName)
-	s.Game.Mux.Unlock()
+	s.Game.RemoveEntity(playerID)
 
 	resp := proto.Response{
-		Player: playerName,
-		Action: &proto.Response_Removeplayer{
-			Removeplayer: &proto.RemovePlayer{},
+		Id: playerID.String(),
+		Action: &proto.Response_Removeentity{
+			Removeentity: &proto.RemoveEntity{},
 		},
 	}
 	s.Broadcast(&resp)
@@ -162,7 +151,7 @@ func (s *GameServer) RemoveClient(playerName string, srv proto.Game_StreamServer
 func (s *GameServer) Stream(srv proto.Game_StreamServer) error {
 	log.Println("start new server")
 	ctx := srv.Context()
-	currentPlayer := ""
+	var playerID uuid.UUID
 	for {
 		select {
 		case <-ctx.Done():
@@ -173,26 +162,26 @@ func (s *GameServer) Stream(srv proto.Game_StreamServer) error {
 		req, err := srv.Recv()
 		if err != nil {
 			log.Printf("receive error %v", err)
-			if currentPlayer != "" {
-				s.RemoveClient(currentPlayer, srv)
+			if playerID.String() != "" {
+				s.RemoveClient(playerID, srv)
 			}
 			continue
 		}
 
 		if req.GetConnect() != nil {
-			currentPlayer = s.HandleConnectRequest(req, srv)
+			playerID = s.HandleConnectRequest(req, srv)
 		}
 
 		// A local variable is used to track the current player.
-		if currentPlayer == "" {
+		if playerID.String() == "" {
 			continue
 		}
 
 		switch req.GetAction().(type) {
 		case *proto.Request_Move:
-			s.HandleMoveRequest(currentPlayer, req, srv)
+			s.HandleMoveRequest(playerID, req, srv)
 		case *proto.Request_Laser:
-			s.HandleLaserRequest(currentPlayer, req, srv)
+			s.HandleLaserRequest(playerID, req, srv)
 		}
 	}
 }

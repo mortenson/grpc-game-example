@@ -107,8 +107,9 @@ func (m *Coordinate) GetY() int32 {
 }
 
 type Player struct {
-	Player               string      `protobuf:"bytes,1,opt,name=player,proto3" json:"player,omitempty"`
-	Position             *Coordinate `protobuf:"bytes,2,opt,name=position,proto3" json:"position,omitempty"`
+	Id                   string      `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	Name                 string      `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
+	Position             *Coordinate `protobuf:"bytes,3,opt,name=position,proto3" json:"position,omitempty"`
 	XXX_NoUnkeyedLiteral struct{}    `json:"-"`
 	XXX_unrecognized     []byte      `json:"-"`
 	XXX_sizecache        int32       `json:"-"`
@@ -139,9 +140,16 @@ func (m *Player) XXX_DiscardUnknown() {
 
 var xxx_messageInfo_Player proto.InternalMessageInfo
 
-func (m *Player) GetPlayer() string {
+func (m *Player) GetId() string {
 	if m != nil {
-		return m.Player
+		return m.Id
+	}
+	return ""
+}
+
+func (m *Player) GetName() string {
+	if m != nil {
+		return m.Name
 	}
 	return ""
 }
@@ -153,8 +161,152 @@ func (m *Player) GetPosition() *Coordinate {
 	return nil
 }
 
+type Laser struct {
+	Id                   string               `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	Direction            Direction            `protobuf:"varint,2,opt,name=direction,proto3,enum=proto.Direction" json:"direction,omitempty"`
+	StartTime            *timestamp.Timestamp `protobuf:"bytes,3,opt,name=startTime,proto3" json:"startTime,omitempty"`
+	InitialPosition      *Coordinate          `protobuf:"bytes,4,opt,name=initialPosition,proto3" json:"initialPosition,omitempty"`
+	XXX_NoUnkeyedLiteral struct{}             `json:"-"`
+	XXX_unrecognized     []byte               `json:"-"`
+	XXX_sizecache        int32                `json:"-"`
+}
+
+func (m *Laser) Reset()         { *m = Laser{} }
+func (m *Laser) String() string { return proto.CompactTextString(m) }
+func (*Laser) ProtoMessage()    {}
+func (*Laser) Descriptor() ([]byte, []int) {
+	return fileDescriptor_098391ad7281b52b, []int{2}
+}
+
+func (m *Laser) XXX_Unmarshal(b []byte) error {
+	return xxx_messageInfo_Laser.Unmarshal(m, b)
+}
+func (m *Laser) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	return xxx_messageInfo_Laser.Marshal(b, m, deterministic)
+}
+func (m *Laser) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_Laser.Merge(m, src)
+}
+func (m *Laser) XXX_Size() int {
+	return xxx_messageInfo_Laser.Size(m)
+}
+func (m *Laser) XXX_DiscardUnknown() {
+	xxx_messageInfo_Laser.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_Laser proto.InternalMessageInfo
+
+func (m *Laser) GetId() string {
+	if m != nil {
+		return m.Id
+	}
+	return ""
+}
+
+func (m *Laser) GetDirection() Direction {
+	if m != nil {
+		return m.Direction
+	}
+	return Direction_UP
+}
+
+func (m *Laser) GetStartTime() *timestamp.Timestamp {
+	if m != nil {
+		return m.StartTime
+	}
+	return nil
+}
+
+func (m *Laser) GetInitialPosition() *Coordinate {
+	if m != nil {
+		return m.InitialPosition
+	}
+	return nil
+}
+
+type Entity struct {
+	// Types that are valid to be assigned to Entity:
+	//	*Entity_Player
+	//	*Entity_Laser
+	Entity               isEntity_Entity `protobuf_oneof:"entity"`
+	XXX_NoUnkeyedLiteral struct{}        `json:"-"`
+	XXX_unrecognized     []byte          `json:"-"`
+	XXX_sizecache        int32           `json:"-"`
+}
+
+func (m *Entity) Reset()         { *m = Entity{} }
+func (m *Entity) String() string { return proto.CompactTextString(m) }
+func (*Entity) ProtoMessage()    {}
+func (*Entity) Descriptor() ([]byte, []int) {
+	return fileDescriptor_098391ad7281b52b, []int{3}
+}
+
+func (m *Entity) XXX_Unmarshal(b []byte) error {
+	return xxx_messageInfo_Entity.Unmarshal(m, b)
+}
+func (m *Entity) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	return xxx_messageInfo_Entity.Marshal(b, m, deterministic)
+}
+func (m *Entity) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_Entity.Merge(m, src)
+}
+func (m *Entity) XXX_Size() int {
+	return xxx_messageInfo_Entity.Size(m)
+}
+func (m *Entity) XXX_DiscardUnknown() {
+	xxx_messageInfo_Entity.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_Entity proto.InternalMessageInfo
+
+type isEntity_Entity interface {
+	isEntity_Entity()
+}
+
+type Entity_Player struct {
+	Player *Player `protobuf:"bytes,2,opt,name=player,proto3,oneof"`
+}
+
+type Entity_Laser struct {
+	Laser *Laser `protobuf:"bytes,3,opt,name=laser,proto3,oneof"`
+}
+
+func (*Entity_Player) isEntity_Entity() {}
+
+func (*Entity_Laser) isEntity_Entity() {}
+
+func (m *Entity) GetEntity() isEntity_Entity {
+	if m != nil {
+		return m.Entity
+	}
+	return nil
+}
+
+func (m *Entity) GetPlayer() *Player {
+	if x, ok := m.GetEntity().(*Entity_Player); ok {
+		return x.Player
+	}
+	return nil
+}
+
+func (m *Entity) GetLaser() *Laser {
+	if x, ok := m.GetEntity().(*Entity_Laser); ok {
+		return x.Laser
+	}
+	return nil
+}
+
+// XXX_OneofWrappers is for the internal use of the proto package.
+func (*Entity) XXX_OneofWrappers() []interface{} {
+	return []interface{}{
+		(*Entity_Player)(nil),
+		(*Entity_Laser)(nil),
+	}
+}
+
 type Connect struct {
-	Player               string   `protobuf:"bytes,1,opt,name=player,proto3" json:"player,omitempty"`
+	Id                   string   `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	Name                 string   `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
 	XXX_NoUnkeyedLiteral struct{} `json:"-"`
 	XXX_unrecognized     []byte   `json:"-"`
 	XXX_sizecache        int32    `json:"-"`
@@ -164,7 +316,7 @@ func (m *Connect) Reset()         { *m = Connect{} }
 func (m *Connect) String() string { return proto.CompactTextString(m) }
 func (*Connect) ProtoMessage()    {}
 func (*Connect) Descriptor() ([]byte, []int) {
-	return fileDescriptor_098391ad7281b52b, []int{2}
+	return fileDescriptor_098391ad7281b52b, []int{4}
 }
 
 func (m *Connect) XXX_Unmarshal(b []byte) error {
@@ -185,17 +337,23 @@ func (m *Connect) XXX_DiscardUnknown() {
 
 var xxx_messageInfo_Connect proto.InternalMessageInfo
 
-func (m *Connect) GetPlayer() string {
+func (m *Connect) GetId() string {
 	if m != nil {
-		return m.Player
+		return m.Id
+	}
+	return ""
+}
+
+func (m *Connect) GetName() string {
+	if m != nil {
+		return m.Name
 	}
 	return ""
 }
 
 type Initialize struct {
 	Position             *Coordinate `protobuf:"bytes,1,opt,name=position,proto3" json:"position,omitempty"`
-	Players              []*Player   `protobuf:"bytes,2,rep,name=players,proto3" json:"players,omitempty"`
-	Lasers               []*Laser    `protobuf:"bytes,3,rep,name=lasers,proto3" json:"lasers,omitempty"`
+	Entities             []*Entity   `protobuf:"bytes,2,rep,name=entities,proto3" json:"entities,omitempty"`
 	XXX_NoUnkeyedLiteral struct{}    `json:"-"`
 	XXX_unrecognized     []byte      `json:"-"`
 	XXX_sizecache        int32       `json:"-"`
@@ -205,7 +363,7 @@ func (m *Initialize) Reset()         { *m = Initialize{} }
 func (m *Initialize) String() string { return proto.CompactTextString(m) }
 func (*Initialize) ProtoMessage()    {}
 func (*Initialize) Descriptor() ([]byte, []int) {
-	return fileDescriptor_098391ad7281b52b, []int{3}
+	return fileDescriptor_098391ad7281b52b, []int{5}
 }
 
 func (m *Initialize) XXX_Unmarshal(b []byte) error {
@@ -233,16 +391,9 @@ func (m *Initialize) GetPosition() *Coordinate {
 	return nil
 }
 
-func (m *Initialize) GetPlayers() []*Player {
+func (m *Initialize) GetEntities() []*Entity {
 	if m != nil {
-		return m.Players
-	}
-	return nil
-}
-
-func (m *Initialize) GetLasers() []*Laser {
-	if m != nil {
-		return m.Lasers
+		return m.Entities
 	}
 	return nil
 }
@@ -258,7 +409,7 @@ func (m *Move) Reset()         { *m = Move{} }
 func (m *Move) String() string { return proto.CompactTextString(m) }
 func (*Move) ProtoMessage()    {}
 func (*Move) Descriptor() ([]byte, []int) {
-	return fileDescriptor_098391ad7281b52b, []int{4}
+	return fileDescriptor_098391ad7281b52b, []int{6}
 }
 
 func (m *Move) XXX_Unmarshal(b []byte) error {
@@ -286,259 +437,117 @@ func (m *Move) GetDirection() Direction {
 	return Direction_UP
 }
 
-type Laser struct {
-	Direction            Direction            `protobuf:"varint,1,opt,name=direction,proto3,enum=proto.Direction" json:"direction,omitempty"`
-	Uuid                 string               `protobuf:"bytes,2,opt,name=uuid,proto3" json:"uuid,omitempty"`
-	Starttime            *timestamp.Timestamp `protobuf:"bytes,3,opt,name=starttime,proto3" json:"starttime,omitempty"`
-	Position             *Coordinate          `protobuf:"bytes,4,opt,name=position,proto3" json:"position,omitempty"`
-	XXX_NoUnkeyedLiteral struct{}             `json:"-"`
-	XXX_unrecognized     []byte               `json:"-"`
-	XXX_sizecache        int32                `json:"-"`
+type AddEntity struct {
+	Entity               *Entity  `protobuf:"bytes,1,opt,name=entity,proto3" json:"entity,omitempty"`
+	XXX_NoUnkeyedLiteral struct{} `json:"-"`
+	XXX_unrecognized     []byte   `json:"-"`
+	XXX_sizecache        int32    `json:"-"`
 }
 
-func (m *Laser) Reset()         { *m = Laser{} }
-func (m *Laser) String() string { return proto.CompactTextString(m) }
-func (*Laser) ProtoMessage()    {}
-func (*Laser) Descriptor() ([]byte, []int) {
-	return fileDescriptor_098391ad7281b52b, []int{5}
-}
-
-func (m *Laser) XXX_Unmarshal(b []byte) error {
-	return xxx_messageInfo_Laser.Unmarshal(m, b)
-}
-func (m *Laser) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
-	return xxx_messageInfo_Laser.Marshal(b, m, deterministic)
-}
-func (m *Laser) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_Laser.Merge(m, src)
-}
-func (m *Laser) XXX_Size() int {
-	return xxx_messageInfo_Laser.Size(m)
-}
-func (m *Laser) XXX_DiscardUnknown() {
-	xxx_messageInfo_Laser.DiscardUnknown(m)
-}
-
-var xxx_messageInfo_Laser proto.InternalMessageInfo
-
-func (m *Laser) GetDirection() Direction {
-	if m != nil {
-		return m.Direction
-	}
-	return Direction_UP
-}
-
-func (m *Laser) GetUuid() string {
-	if m != nil {
-		return m.Uuid
-	}
-	return ""
-}
-
-func (m *Laser) GetStarttime() *timestamp.Timestamp {
-	if m != nil {
-		return m.Starttime
-	}
-	return nil
-}
-
-func (m *Laser) GetPosition() *Coordinate {
-	if m != nil {
-		return m.Position
-	}
-	return nil
-}
-
-type AddPlayer struct {
-	Position             *Coordinate `protobuf:"bytes,1,opt,name=position,proto3" json:"position,omitempty"`
-	XXX_NoUnkeyedLiteral struct{}    `json:"-"`
-	XXX_unrecognized     []byte      `json:"-"`
-	XXX_sizecache        int32       `json:"-"`
-}
-
-func (m *AddPlayer) Reset()         { *m = AddPlayer{} }
-func (m *AddPlayer) String() string { return proto.CompactTextString(m) }
-func (*AddPlayer) ProtoMessage()    {}
-func (*AddPlayer) Descriptor() ([]byte, []int) {
-	return fileDescriptor_098391ad7281b52b, []int{6}
-}
-
-func (m *AddPlayer) XXX_Unmarshal(b []byte) error {
-	return xxx_messageInfo_AddPlayer.Unmarshal(m, b)
-}
-func (m *AddPlayer) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
-	return xxx_messageInfo_AddPlayer.Marshal(b, m, deterministic)
-}
-func (m *AddPlayer) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_AddPlayer.Merge(m, src)
-}
-func (m *AddPlayer) XXX_Size() int {
-	return xxx_messageInfo_AddPlayer.Size(m)
-}
-func (m *AddPlayer) XXX_DiscardUnknown() {
-	xxx_messageInfo_AddPlayer.DiscardUnknown(m)
-}
-
-var xxx_messageInfo_AddPlayer proto.InternalMessageInfo
-
-func (m *AddPlayer) GetPosition() *Coordinate {
-	if m != nil {
-		return m.Position
-	}
-	return nil
-}
-
-type UpdatePlayer struct {
-	Position             *Coordinate `protobuf:"bytes,1,opt,name=position,proto3" json:"position,omitempty"`
-	XXX_NoUnkeyedLiteral struct{}    `json:"-"`
-	XXX_unrecognized     []byte      `json:"-"`
-	XXX_sizecache        int32       `json:"-"`
-}
-
-func (m *UpdatePlayer) Reset()         { *m = UpdatePlayer{} }
-func (m *UpdatePlayer) String() string { return proto.CompactTextString(m) }
-func (*UpdatePlayer) ProtoMessage()    {}
-func (*UpdatePlayer) Descriptor() ([]byte, []int) {
+func (m *AddEntity) Reset()         { *m = AddEntity{} }
+func (m *AddEntity) String() string { return proto.CompactTextString(m) }
+func (*AddEntity) ProtoMessage()    {}
+func (*AddEntity) Descriptor() ([]byte, []int) {
 	return fileDescriptor_098391ad7281b52b, []int{7}
 }
 
-func (m *UpdatePlayer) XXX_Unmarshal(b []byte) error {
-	return xxx_messageInfo_UpdatePlayer.Unmarshal(m, b)
+func (m *AddEntity) XXX_Unmarshal(b []byte) error {
+	return xxx_messageInfo_AddEntity.Unmarshal(m, b)
 }
-func (m *UpdatePlayer) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
-	return xxx_messageInfo_UpdatePlayer.Marshal(b, m, deterministic)
+func (m *AddEntity) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	return xxx_messageInfo_AddEntity.Marshal(b, m, deterministic)
 }
-func (m *UpdatePlayer) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_UpdatePlayer.Merge(m, src)
+func (m *AddEntity) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_AddEntity.Merge(m, src)
 }
-func (m *UpdatePlayer) XXX_Size() int {
-	return xxx_messageInfo_UpdatePlayer.Size(m)
+func (m *AddEntity) XXX_Size() int {
+	return xxx_messageInfo_AddEntity.Size(m)
 }
-func (m *UpdatePlayer) XXX_DiscardUnknown() {
-	xxx_messageInfo_UpdatePlayer.DiscardUnknown(m)
+func (m *AddEntity) XXX_DiscardUnknown() {
+	xxx_messageInfo_AddEntity.DiscardUnknown(m)
 }
 
-var xxx_messageInfo_UpdatePlayer proto.InternalMessageInfo
+var xxx_messageInfo_AddEntity proto.InternalMessageInfo
 
-func (m *UpdatePlayer) GetPosition() *Coordinate {
+func (m *AddEntity) GetEntity() *Entity {
 	if m != nil {
-		return m.Position
+		return m.Entity
 	}
 	return nil
 }
 
-type RemovePlayer struct {
+type UpdateEntity struct {
+	Entity               *Entity  `protobuf:"bytes,1,opt,name=entity,proto3" json:"entity,omitempty"`
 	XXX_NoUnkeyedLiteral struct{} `json:"-"`
 	XXX_unrecognized     []byte   `json:"-"`
 	XXX_sizecache        int32    `json:"-"`
 }
 
-func (m *RemovePlayer) Reset()         { *m = RemovePlayer{} }
-func (m *RemovePlayer) String() string { return proto.CompactTextString(m) }
-func (*RemovePlayer) ProtoMessage()    {}
-func (*RemovePlayer) Descriptor() ([]byte, []int) {
+func (m *UpdateEntity) Reset()         { *m = UpdateEntity{} }
+func (m *UpdateEntity) String() string { return proto.CompactTextString(m) }
+func (*UpdateEntity) ProtoMessage()    {}
+func (*UpdateEntity) Descriptor() ([]byte, []int) {
 	return fileDescriptor_098391ad7281b52b, []int{8}
 }
 
-func (m *RemovePlayer) XXX_Unmarshal(b []byte) error {
-	return xxx_messageInfo_RemovePlayer.Unmarshal(m, b)
+func (m *UpdateEntity) XXX_Unmarshal(b []byte) error {
+	return xxx_messageInfo_UpdateEntity.Unmarshal(m, b)
 }
-func (m *RemovePlayer) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
-	return xxx_messageInfo_RemovePlayer.Marshal(b, m, deterministic)
+func (m *UpdateEntity) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	return xxx_messageInfo_UpdateEntity.Marshal(b, m, deterministic)
 }
-func (m *RemovePlayer) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_RemovePlayer.Merge(m, src)
+func (m *UpdateEntity) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_UpdateEntity.Merge(m, src)
 }
-func (m *RemovePlayer) XXX_Size() int {
-	return xxx_messageInfo_RemovePlayer.Size(m)
+func (m *UpdateEntity) XXX_Size() int {
+	return xxx_messageInfo_UpdateEntity.Size(m)
 }
-func (m *RemovePlayer) XXX_DiscardUnknown() {
-	xxx_messageInfo_RemovePlayer.DiscardUnknown(m)
-}
-
-var xxx_messageInfo_RemovePlayer proto.InternalMessageInfo
-
-type AddLaser struct {
-	Laser                *Laser   `protobuf:"bytes,1,opt,name=laser,proto3" json:"laser,omitempty"`
-	XXX_NoUnkeyedLiteral struct{} `json:"-"`
-	XXX_unrecognized     []byte   `json:"-"`
-	XXX_sizecache        int32    `json:"-"`
+func (m *UpdateEntity) XXX_DiscardUnknown() {
+	xxx_messageInfo_UpdateEntity.DiscardUnknown(m)
 }
 
-func (m *AddLaser) Reset()         { *m = AddLaser{} }
-func (m *AddLaser) String() string { return proto.CompactTextString(m) }
-func (*AddLaser) ProtoMessage()    {}
-func (*AddLaser) Descriptor() ([]byte, []int) {
-	return fileDescriptor_098391ad7281b52b, []int{9}
-}
+var xxx_messageInfo_UpdateEntity proto.InternalMessageInfo
 
-func (m *AddLaser) XXX_Unmarshal(b []byte) error {
-	return xxx_messageInfo_AddLaser.Unmarshal(m, b)
-}
-func (m *AddLaser) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
-	return xxx_messageInfo_AddLaser.Marshal(b, m, deterministic)
-}
-func (m *AddLaser) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_AddLaser.Merge(m, src)
-}
-func (m *AddLaser) XXX_Size() int {
-	return xxx_messageInfo_AddLaser.Size(m)
-}
-func (m *AddLaser) XXX_DiscardUnknown() {
-	xxx_messageInfo_AddLaser.DiscardUnknown(m)
-}
-
-var xxx_messageInfo_AddLaser proto.InternalMessageInfo
-
-func (m *AddLaser) GetLaser() *Laser {
+func (m *UpdateEntity) GetEntity() *Entity {
 	if m != nil {
-		return m.Laser
+		return m.Entity
 	}
 	return nil
 }
 
-type RemoveLaser struct {
-	Uuid                 string   `protobuf:"bytes,1,opt,name=uuid,proto3" json:"uuid,omitempty"`
+type RemoveEntity struct {
 	XXX_NoUnkeyedLiteral struct{} `json:"-"`
 	XXX_unrecognized     []byte   `json:"-"`
 	XXX_sizecache        int32    `json:"-"`
 }
 
-func (m *RemoveLaser) Reset()         { *m = RemoveLaser{} }
-func (m *RemoveLaser) String() string { return proto.CompactTextString(m) }
-func (*RemoveLaser) ProtoMessage()    {}
-func (*RemoveLaser) Descriptor() ([]byte, []int) {
-	return fileDescriptor_098391ad7281b52b, []int{10}
+func (m *RemoveEntity) Reset()         { *m = RemoveEntity{} }
+func (m *RemoveEntity) String() string { return proto.CompactTextString(m) }
+func (*RemoveEntity) ProtoMessage()    {}
+func (*RemoveEntity) Descriptor() ([]byte, []int) {
+	return fileDescriptor_098391ad7281b52b, []int{9}
 }
 
-func (m *RemoveLaser) XXX_Unmarshal(b []byte) error {
-	return xxx_messageInfo_RemoveLaser.Unmarshal(m, b)
+func (m *RemoveEntity) XXX_Unmarshal(b []byte) error {
+	return xxx_messageInfo_RemoveEntity.Unmarshal(m, b)
 }
-func (m *RemoveLaser) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
-	return xxx_messageInfo_RemoveLaser.Marshal(b, m, deterministic)
+func (m *RemoveEntity) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	return xxx_messageInfo_RemoveEntity.Marshal(b, m, deterministic)
 }
-func (m *RemoveLaser) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_RemoveLaser.Merge(m, src)
+func (m *RemoveEntity) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_RemoveEntity.Merge(m, src)
 }
-func (m *RemoveLaser) XXX_Size() int {
-	return xxx_messageInfo_RemoveLaser.Size(m)
+func (m *RemoveEntity) XXX_Size() int {
+	return xxx_messageInfo_RemoveEntity.Size(m)
 }
-func (m *RemoveLaser) XXX_DiscardUnknown() {
-	xxx_messageInfo_RemoveLaser.DiscardUnknown(m)
+func (m *RemoveEntity) XXX_DiscardUnknown() {
+	xxx_messageInfo_RemoveEntity.DiscardUnknown(m)
 }
 
-var xxx_messageInfo_RemoveLaser proto.InternalMessageInfo
-
-func (m *RemoveLaser) GetUuid() string {
-	if m != nil {
-		return m.Uuid
-	}
-	return ""
-}
+var xxx_messageInfo_RemoveEntity proto.InternalMessageInfo
 
 type PlayerKilled struct {
-	Player               string      `protobuf:"bytes,1,opt,name=player,proto3" json:"player,omitempty"`
-	SpawnPosition        *Coordinate `protobuf:"bytes,2,opt,name=spawnPosition,proto3" json:"spawnPosition,omitempty"`
+	SpawnPosition        *Coordinate `protobuf:"bytes,1,opt,name=spawnPosition,proto3" json:"spawnPosition,omitempty"`
 	XXX_NoUnkeyedLiteral struct{}    `json:"-"`
 	XXX_unrecognized     []byte      `json:"-"`
 	XXX_sizecache        int32       `json:"-"`
@@ -548,7 +557,7 @@ func (m *PlayerKilled) Reset()         { *m = PlayerKilled{} }
 func (m *PlayerKilled) String() string { return proto.CompactTextString(m) }
 func (*PlayerKilled) ProtoMessage()    {}
 func (*PlayerKilled) Descriptor() ([]byte, []int) {
-	return fileDescriptor_098391ad7281b52b, []int{11}
+	return fileDescriptor_098391ad7281b52b, []int{10}
 }
 
 func (m *PlayerKilled) XXX_Unmarshal(b []byte) error {
@@ -568,13 +577,6 @@ func (m *PlayerKilled) XXX_DiscardUnknown() {
 }
 
 var xxx_messageInfo_PlayerKilled proto.InternalMessageInfo
-
-func (m *PlayerKilled) GetPlayer() string {
-	if m != nil {
-		return m.Player
-	}
-	return ""
-}
 
 func (m *PlayerKilled) GetSpawnPosition() *Coordinate {
 	if m != nil {
@@ -598,7 +600,7 @@ func (m *Request) Reset()         { *m = Request{} }
 func (m *Request) String() string { return proto.CompactTextString(m) }
 func (*Request) ProtoMessage()    {}
 func (*Request) Descriptor() ([]byte, []int) {
-	return fileDescriptor_098391ad7281b52b, []int{12}
+	return fileDescriptor_098391ad7281b52b, []int{11}
 }
 
 func (m *Request) XXX_Unmarshal(b []byte) error {
@@ -679,15 +681,13 @@ func (*Request) XXX_OneofWrappers() []interface{} {
 }
 
 type Response struct {
-	Player string `protobuf:"bytes,1,opt,name=player,proto3" json:"player,omitempty"`
+	Id string `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
 	// Types that are valid to be assigned to Action:
 	//	*Response_Initialize
-	//	*Response_Addplayer
-	//	*Response_Updateplayer
-	//	*Response_Removeplayer
-	//	*Response_Addlaser
-	//	*Response_Removelaser
-	//	*Response_Playerkilled
+	//	*Response_AddEntity
+	//	*Response_UpdateEntity
+	//	*Response_RemoveEntity
+	//	*Response_PlayerKilled
 	Action               isResponse_Action `protobuf_oneof:"action"`
 	XXX_NoUnkeyedLiteral struct{}          `json:"-"`
 	XXX_unrecognized     []byte            `json:"-"`
@@ -698,7 +698,7 @@ func (m *Response) Reset()         { *m = Response{} }
 func (m *Response) String() string { return proto.CompactTextString(m) }
 func (*Response) ProtoMessage()    {}
 func (*Response) Descriptor() ([]byte, []int) {
-	return fileDescriptor_098391ad7281b52b, []int{13}
+	return fileDescriptor_098391ad7281b52b, []int{12}
 }
 
 func (m *Response) XXX_Unmarshal(b []byte) error {
@@ -719,9 +719,9 @@ func (m *Response) XXX_DiscardUnknown() {
 
 var xxx_messageInfo_Response proto.InternalMessageInfo
 
-func (m *Response) GetPlayer() string {
+func (m *Response) GetId() string {
 	if m != nil {
-		return m.Player
+		return m.Id
 	}
 	return ""
 }
@@ -731,46 +731,34 @@ type isResponse_Action interface {
 }
 
 type Response_Initialize struct {
-	Initialize *Initialize `protobuf:"bytes,3,opt,name=initialize,proto3,oneof"`
+	Initialize *Initialize `protobuf:"bytes,2,opt,name=initialize,proto3,oneof"`
 }
 
-type Response_Addplayer struct {
-	Addplayer *AddPlayer `protobuf:"bytes,4,opt,name=addplayer,proto3,oneof"`
+type Response_AddEntity struct {
+	AddEntity *AddEntity `protobuf:"bytes,3,opt,name=addEntity,proto3,oneof"`
 }
 
-type Response_Updateplayer struct {
-	Updateplayer *UpdatePlayer `protobuf:"bytes,5,opt,name=updateplayer,proto3,oneof"`
+type Response_UpdateEntity struct {
+	UpdateEntity *UpdateEntity `protobuf:"bytes,4,opt,name=updateEntity,proto3,oneof"`
 }
 
-type Response_Removeplayer struct {
-	Removeplayer *RemovePlayer `protobuf:"bytes,6,opt,name=removeplayer,proto3,oneof"`
+type Response_RemoveEntity struct {
+	RemoveEntity *RemoveEntity `protobuf:"bytes,5,opt,name=removeEntity,proto3,oneof"`
 }
 
-type Response_Addlaser struct {
-	Addlaser *AddLaser `protobuf:"bytes,7,opt,name=addlaser,proto3,oneof"`
-}
-
-type Response_Removelaser struct {
-	Removelaser *RemoveLaser `protobuf:"bytes,8,opt,name=removelaser,proto3,oneof"`
-}
-
-type Response_Playerkilled struct {
-	Playerkilled *PlayerKilled `protobuf:"bytes,9,opt,name=playerkilled,proto3,oneof"`
+type Response_PlayerKilled struct {
+	PlayerKilled *PlayerKilled `protobuf:"bytes,6,opt,name=playerKilled,proto3,oneof"`
 }
 
 func (*Response_Initialize) isResponse_Action() {}
 
-func (*Response_Addplayer) isResponse_Action() {}
+func (*Response_AddEntity) isResponse_Action() {}
 
-func (*Response_Updateplayer) isResponse_Action() {}
+func (*Response_UpdateEntity) isResponse_Action() {}
 
-func (*Response_Removeplayer) isResponse_Action() {}
+func (*Response_RemoveEntity) isResponse_Action() {}
 
-func (*Response_Addlaser) isResponse_Action() {}
-
-func (*Response_Removelaser) isResponse_Action() {}
-
-func (*Response_Playerkilled) isResponse_Action() {}
+func (*Response_PlayerKilled) isResponse_Action() {}
 
 func (m *Response) GetAction() isResponse_Action {
 	if m != nil {
@@ -786,44 +774,30 @@ func (m *Response) GetInitialize() *Initialize {
 	return nil
 }
 
-func (m *Response) GetAddplayer() *AddPlayer {
-	if x, ok := m.GetAction().(*Response_Addplayer); ok {
-		return x.Addplayer
+func (m *Response) GetAddEntity() *AddEntity {
+	if x, ok := m.GetAction().(*Response_AddEntity); ok {
+		return x.AddEntity
 	}
 	return nil
 }
 
-func (m *Response) GetUpdateplayer() *UpdatePlayer {
-	if x, ok := m.GetAction().(*Response_Updateplayer); ok {
-		return x.Updateplayer
+func (m *Response) GetUpdateEntity() *UpdateEntity {
+	if x, ok := m.GetAction().(*Response_UpdateEntity); ok {
+		return x.UpdateEntity
 	}
 	return nil
 }
 
-func (m *Response) GetRemoveplayer() *RemovePlayer {
-	if x, ok := m.GetAction().(*Response_Removeplayer); ok {
-		return x.Removeplayer
+func (m *Response) GetRemoveEntity() *RemoveEntity {
+	if x, ok := m.GetAction().(*Response_RemoveEntity); ok {
+		return x.RemoveEntity
 	}
 	return nil
 }
 
-func (m *Response) GetAddlaser() *AddLaser {
-	if x, ok := m.GetAction().(*Response_Addlaser); ok {
-		return x.Addlaser
-	}
-	return nil
-}
-
-func (m *Response) GetRemovelaser() *RemoveLaser {
-	if x, ok := m.GetAction().(*Response_Removelaser); ok {
-		return x.Removelaser
-	}
-	return nil
-}
-
-func (m *Response) GetPlayerkilled() *PlayerKilled {
-	if x, ok := m.GetAction().(*Response_Playerkilled); ok {
-		return x.Playerkilled
+func (m *Response) GetPlayerKilled() *PlayerKilled {
+	if x, ok := m.GetAction().(*Response_PlayerKilled); ok {
+		return x.PlayerKilled
 	}
 	return nil
 }
@@ -832,12 +806,10 @@ func (m *Response) GetPlayerkilled() *PlayerKilled {
 func (*Response) XXX_OneofWrappers() []interface{} {
 	return []interface{}{
 		(*Response_Initialize)(nil),
-		(*Response_Addplayer)(nil),
-		(*Response_Updateplayer)(nil),
-		(*Response_Removeplayer)(nil),
-		(*Response_Addlaser)(nil),
-		(*Response_Removelaser)(nil),
-		(*Response_Playerkilled)(nil),
+		(*Response_AddEntity)(nil),
+		(*Response_UpdateEntity)(nil),
+		(*Response_RemoveEntity)(nil),
+		(*Response_PlayerKilled)(nil),
 	}
 }
 
@@ -845,15 +817,14 @@ func init() {
 	proto.RegisterEnum("proto.Direction", Direction_name, Direction_value)
 	proto.RegisterType((*Coordinate)(nil), "proto.Coordinate")
 	proto.RegisterType((*Player)(nil), "proto.Player")
+	proto.RegisterType((*Laser)(nil), "proto.Laser")
+	proto.RegisterType((*Entity)(nil), "proto.Entity")
 	proto.RegisterType((*Connect)(nil), "proto.Connect")
 	proto.RegisterType((*Initialize)(nil), "proto.Initialize")
 	proto.RegisterType((*Move)(nil), "proto.Move")
-	proto.RegisterType((*Laser)(nil), "proto.Laser")
-	proto.RegisterType((*AddPlayer)(nil), "proto.AddPlayer")
-	proto.RegisterType((*UpdatePlayer)(nil), "proto.UpdatePlayer")
-	proto.RegisterType((*RemovePlayer)(nil), "proto.RemovePlayer")
-	proto.RegisterType((*AddLaser)(nil), "proto.AddLaser")
-	proto.RegisterType((*RemoveLaser)(nil), "proto.RemoveLaser")
+	proto.RegisterType((*AddEntity)(nil), "proto.AddEntity")
+	proto.RegisterType((*UpdateEntity)(nil), "proto.UpdateEntity")
+	proto.RegisterType((*RemoveEntity)(nil), "proto.RemoveEntity")
 	proto.RegisterType((*PlayerKilled)(nil), "proto.PlayerKilled")
 	proto.RegisterType((*Request)(nil), "proto.Request")
 	proto.RegisterType((*Response)(nil), "proto.Response")
@@ -864,49 +835,47 @@ func init() {
 }
 
 var fileDescriptor_098391ad7281b52b = []byte{
-	// 667 bytes of a gzipped FileDescriptorProto
-	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0x9c, 0x54, 0xcd, 0x6e, 0xd3, 0x4c,
-	0x14, 0xb5, 0x13, 0xc7, 0x89, 0x6f, 0xd2, 0xd4, 0xdf, 0x7c, 0x12, 0x8a, 0xba, 0xa1, 0x1d, 0x55,
-	0x22, 0xaa, 0x84, 0x53, 0xa5, 0x52, 0x0b, 0x08, 0x16, 0xa5, 0x85, 0xba, 0xa2, 0xd0, 0x68, 0x9a,
-	0x8a, 0x25, 0x9a, 0x76, 0x86, 0xca, 0x22, 0xb1, 0x8d, 0xed, 0x94, 0x96, 0x27, 0x40, 0xbc, 0x0a,
-	0x5b, 0x1e, 0x10, 0xcd, 0x8f, 0xff, 0x54, 0x45, 0x11, 0xac, 0x32, 0x3f, 0xe7, 0xdc, 0x7b, 0xe7,
-	0x9c, 0xe3, 0x80, 0x1b, 0x27, 0x51, 0x16, 0x8d, 0xe6, 0x34, 0x08, 0x3d, 0xb9, 0x44, 0x2d, 0xf9,
-	0xb3, 0xf1, 0xf8, 0x26, 0x8a, 0x6e, 0x66, 0x7c, 0x24, 0x77, 0x57, 0x8b, 0xcf, 0xa3, 0x2c, 0x98,
-	0xf3, 0x34, 0xa3, 0xf3, 0x58, 0xe1, 0xf0, 0x10, 0xe0, 0x28, 0x8a, 0x12, 0x16, 0x84, 0x34, 0xe3,
-	0xa8, 0x07, 0xe6, 0xdd, 0xc0, 0xdc, 0x34, 0x87, 0x2d, 0x62, 0xde, 0x89, 0xdd, 0xfd, 0xa0, 0xa1,
-	0x76, 0xf7, 0xf8, 0x1c, 0xec, 0xc9, 0x8c, 0xde, 0xf3, 0x04, 0x3d, 0x02, 0x3b, 0x96, 0x2b, 0x09,
-	0x75, 0x88, 0xde, 0xa1, 0xa7, 0xd0, 0x89, 0xa3, 0x34, 0xc8, 0x82, 0x28, 0x94, 0xb4, 0xee, 0xf8,
-	0x3f, 0xd5, 0xc5, 0x2b, 0x5b, 0x90, 0x02, 0x82, 0xb7, 0xa0, 0x7d, 0x14, 0x85, 0x21, 0xbf, 0xce,
-	0x96, 0x55, 0xc4, 0x3f, 0x4d, 0x80, 0xd3, 0x30, 0xc8, 0x02, 0x3a, 0x0b, 0xbe, 0xf3, 0x5a, 0x03,
-	0x73, 0x65, 0x03, 0xf4, 0x04, 0xda, 0xaa, 0x4e, 0x3a, 0x68, 0x6c, 0x36, 0x87, 0xdd, 0xf1, 0x9a,
-	0x46, 0xab, 0x77, 0x90, 0xfc, 0x16, 0x6d, 0x83, 0x3d, 0xa3, 0xa9, 0xc0, 0x35, 0x25, 0xae, 0xa7,
-	0x71, 0x67, 0xe2, 0x90, 0xe8, 0x3b, 0xbc, 0x0f, 0xd6, 0xfb, 0xe8, 0x96, 0x23, 0x0f, 0x1c, 0x16,
-	0x24, 0xfc, 0xba, 0x18, 0xa3, 0x3f, 0x76, 0x35, 0xe1, 0x38, 0x3f, 0x27, 0x25, 0x04, 0xff, 0x36,
-	0xa1, 0x25, 0x2b, 0xfd, 0x2d, 0x13, 0x21, 0xb0, 0x16, 0x8b, 0x80, 0x49, 0x31, 0x1d, 0x22, 0xd7,
-	0xe8, 0x19, 0x38, 0x69, 0x46, 0x93, 0x4c, 0x18, 0x39, 0x68, 0x4a, 0x11, 0x36, 0x3c, 0xe5, 0xb2,
-	0x97, 0xbb, 0xec, 0x4d, 0x73, 0x97, 0x49, 0x09, 0xae, 0xa9, 0x67, 0xad, 0xb6, 0xe7, 0x05, 0x38,
-	0x87, 0x8c, 0x4d, 0x1e, 0x5a, 0xbb, 0x5a, 0x79, 0xfc, 0x0a, 0x7a, 0x97, 0x31, 0xa3, 0x19, 0xff,
-	0x37, 0x7a, 0x1f, 0x7a, 0x84, 0xcf, 0xa3, 0x5b, 0x4d, 0xc7, 0x1e, 0x74, 0x0e, 0x19, 0x53, 0x1a,
-	0x62, 0x68, 0x49, 0x3f, 0x74, 0x9d, 0xba, 0x55, 0xea, 0x0a, 0x6f, 0x41, 0x57, 0xf1, 0x15, 0x25,
-	0x97, 0xd1, 0x2c, 0x65, 0xc4, 0x9f, 0xa0, 0xa7, 0x8a, 0xbf, 0x0b, 0x66, 0x33, 0xce, 0x96, 0x66,
-	0xfa, 0x00, 0xd6, 0xd2, 0x98, 0x7e, 0x0b, 0x27, 0x2b, 0x83, 0x5d, 0xc7, 0xe1, 0x1f, 0x26, 0xb4,
-	0x09, 0xff, 0xba, 0xe0, 0x69, 0x86, 0x76, 0xa0, 0x7d, 0xad, 0x92, 0xae, 0xa7, 0xee, 0x17, 0x74,
-	0x79, 0xea, 0x1b, 0x24, 0x07, 0xa0, 0x2d, 0xb0, 0xc4, 0xe4, 0xba, 0x4f, 0x57, 0x03, 0x45, 0xf0,
-	0x7c, 0x83, 0xc8, 0x2b, 0xb4, 0x9d, 0x4b, 0xd0, 0x7c, 0x28, 0x81, 0x6f, 0x68, 0x11, 0x5e, 0x77,
-	0xc0, 0xa6, 0x2a, 0x80, 0xbf, 0x9a, 0xd0, 0x21, 0x3c, 0x8d, 0xa3, 0x30, 0xe5, 0x4b, 0x1f, 0xba,
-	0x07, 0x10, 0x14, 0x5f, 0x9a, 0xae, 0x9c, 0xbf, 0xb2, 0xfc, 0x04, 0x7d, 0x83, 0x54, 0x60, 0x68,
-	0x17, 0x1c, 0xca, 0x98, 0xae, 0xa7, 0x32, 0x95, 0x07, 0xba, 0xc8, 0x8e, 0x6f, 0x90, 0x12, 0x84,
-	0x9e, 0x43, 0x6f, 0x21, 0x93, 0xa1, 0x49, 0x2d, 0x49, 0xfa, 0x5f, 0x93, 0xaa, 0xa1, 0xf1, 0x0d,
-	0x52, 0x83, 0x0a, 0x6a, 0x22, 0x5d, 0xd5, 0x54, 0xbb, 0x46, 0xad, 0x06, 0x46, 0x50, 0xab, 0x50,
-	0x91, 0x3f, 0xca, 0x98, 0x12, 0xad, 0x2d, 0x69, 0xeb, 0xe5, 0x98, 0xb9, 0x6e, 0x05, 0x04, 0xed,
-	0x43, 0x57, 0xd1, 0x15, 0xa3, 0x23, 0x19, 0xa8, 0xd6, 0x28, 0x27, 0x55, 0x81, 0x62, 0x42, 0xd5,
-	0xf0, 0x8b, 0x0c, 0xd5, 0xc0, 0xa9, 0x4d, 0x58, 0xcd, 0x9b, 0x98, 0xb0, 0x0a, 0x2d, 0xdd, 0xda,
-	0x79, 0x09, 0x4e, 0xf1, 0x67, 0x80, 0x6c, 0x68, 0x5c, 0x4e, 0x5c, 0x03, 0x75, 0xc0, 0x3a, 0x3e,
-	0xff, 0xf8, 0xc1, 0x35, 0xc5, 0xea, 0xec, 0xcd, 0xdb, 0xa9, 0xdb, 0x40, 0x0e, 0xb4, 0xc8, 0xe9,
-	0x89, 0x3f, 0x75, 0x9b, 0xe2, 0xf0, 0x62, 0x7a, 0x3e, 0x71, 0xad, 0xf1, 0x01, 0x58, 0x27, 0x74,
-	0xce, 0xd1, 0x08, 0xec, 0x8b, 0x2c, 0xe1, 0x74, 0x8e, 0xfa, 0xc5, 0xdc, 0x32, 0x8c, 0x1b, 0xeb,
-	0xc5, 0x5e, 0x25, 0x02, 0x1b, 0x43, 0x73, 0xd7, 0xbc, 0xb2, 0xe5, 0xe9, 0xde, 0x9f, 0x00, 0x00,
-	0x00, 0xff, 0xff, 0xca, 0x0f, 0x9e, 0x81, 0x4b, 0x06, 0x00, 0x00,
+	// 636 bytes of a gzipped FileDescriptorProto
+	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0x94, 0x54, 0x5f, 0x53, 0xd3, 0x4e,
+	0x14, 0x4d, 0x42, 0x1a, 0x9a, 0x4b, 0x29, 0xf9, 0xed, 0xef, 0xa5, 0xc3, 0x8b, 0x98, 0xd1, 0xb1,
+	0x32, 0x43, 0xcb, 0x94, 0x51, 0x74, 0xf4, 0x45, 0x01, 0x09, 0x23, 0x4a, 0x67, 0x29, 0xe3, 0x83,
+	0x4f, 0x0b, 0x59, 0x98, 0x9d, 0x69, 0xb2, 0x31, 0x59, 0x90, 0xfa, 0x09, 0xfc, 0x50, 0x8e, 0x9f,
+	0xcd, 0xd9, 0x3f, 0x49, 0x13, 0xd4, 0x29, 0x3e, 0x75, 0xff, 0x9c, 0xb3, 0xf7, 0xdc, 0x73, 0x6e,
+	0x03, 0x41, 0x96, 0x73, 0xc1, 0x87, 0x09, 0x61, 0xe9, 0x40, 0x2d, 0x51, 0x4b, 0xfd, 0xac, 0x3f,
+	0xb8, 0xe2, 0xfc, 0x6a, 0x4a, 0x87, 0x6a, 0x77, 0x7e, 0x7d, 0x39, 0x14, 0x2c, 0xa1, 0x85, 0x20,
+	0x49, 0xa6, 0x71, 0x61, 0x1f, 0x60, 0x8f, 0xf3, 0x3c, 0x66, 0x29, 0x11, 0x14, 0x75, 0xc0, 0xbe,
+	0xed, 0xd9, 0x1b, 0x76, 0xbf, 0x85, 0xed, 0x5b, 0xb9, 0x9b, 0xf5, 0x1c, 0xbd, 0x9b, 0x85, 0x9f,
+	0xc1, 0x1b, 0x4f, 0xc9, 0x8c, 0xe6, 0xa8, 0x0b, 0x0e, 0x8b, 0x15, 0xcc, 0xc7, 0x0e, 0x8b, 0x11,
+	0x02, 0x37, 0x25, 0x09, 0x55, 0x50, 0x1f, 0xab, 0x35, 0xda, 0x82, 0x76, 0xc6, 0x0b, 0x26, 0x18,
+	0x4f, 0x7b, 0x4b, 0x1b, 0x76, 0x7f, 0x65, 0xf4, 0x9f, 0xae, 0x38, 0x98, 0x97, 0xc3, 0x15, 0x24,
+	0xfc, 0x69, 0x43, 0xeb, 0x98, 0x14, 0x7f, 0x78, 0x7c, 0x00, 0x7e, 0xcc, 0x72, 0x7a, 0xa1, 0x5e,
+	0x92, 0x15, 0xba, 0xa3, 0xc0, 0xbc, 0xb4, 0x5f, 0x9e, 0xe3, 0x39, 0x04, 0xbd, 0x00, 0xbf, 0x10,
+	0x24, 0x17, 0x13, 0x96, 0x50, 0x53, 0x79, 0x7d, 0xa0, 0x5d, 0x18, 0x94, 0x2e, 0x0c, 0x26, 0xa5,
+	0x0b, 0x78, 0x0e, 0x46, 0xaf, 0x60, 0x8d, 0xa5, 0x4c, 0x30, 0x32, 0x1d, 0x97, 0xca, 0xdd, 0xbf,
+	0x29, 0xbf, 0x8b, 0x0c, 0x09, 0x78, 0x07, 0xa9, 0x60, 0x62, 0x86, 0x9e, 0x80, 0x97, 0x29, 0x9f,
+	0x94, 0xda, 0x95, 0xd1, 0xaa, 0x61, 0x6b, 0xf3, 0x22, 0x0b, 0x9b, 0x6b, 0xf4, 0x08, 0x5a, 0x53,
+	0xd9, 0xb2, 0x51, 0xd9, 0x31, 0x38, 0x65, 0x43, 0x64, 0x61, 0x7d, 0xf9, 0xb6, 0x0d, 0x1e, 0x55,
+	0x0f, 0x87, 0x5b, 0xb0, 0xbc, 0xc7, 0xd3, 0x94, 0x5e, 0x88, 0xfb, 0x24, 0x10, 0x5e, 0x02, 0x1c,
+	0x69, 0x91, 0xec, 0x5b, 0x33, 0x0f, 0x7b, 0x61, 0x1e, 0xe8, 0x29, 0xb4, 0x55, 0x55, 0x46, 0x8b,
+	0x9e, 0xb3, 0xb1, 0x54, 0x6b, 0x43, 0x77, 0x89, 0xab, 0xeb, 0xf0, 0x39, 0xb8, 0x1f, 0xf8, 0x0d,
+	0x6d, 0x06, 0x65, 0x2f, 0x0c, 0x2a, 0x1c, 0x81, 0xff, 0x26, 0x8e, 0x8d, 0x69, 0x8f, 0xcb, 0x2e,
+	0x8d, 0xb8, 0x3b, 0xd5, 0x4a, 0x0b, 0x9e, 0x41, 0xe7, 0x2c, 0x8b, 0x89, 0xa0, 0xff, 0x46, 0xeb,
+	0x42, 0x07, 0xd3, 0x84, 0xdf, 0x18, 0x5a, 0x78, 0x08, 0x1d, 0x9d, 0xc6, 0x7b, 0x36, 0x9d, 0xd2,
+	0x18, 0xed, 0xc2, 0x6a, 0x91, 0x91, 0xaf, 0xe9, 0x78, 0xa1, 0x43, 0x4d, 0x5c, 0xf8, 0xdd, 0x86,
+	0x65, 0x4c, 0xbf, 0x5c, 0xd3, 0x42, 0xa0, 0x4d, 0x58, 0xbe, 0xd0, 0xf1, 0x18, 0x7a, 0xb7, 0xa2,
+	0xab, 0xd3, 0xc8, 0xc2, 0x25, 0x00, 0x3d, 0x04, 0x57, 0xca, 0x31, 0x13, 0xb2, 0x62, 0x80, 0xd2,
+	0xc6, 0xc8, 0xc2, 0xea, 0xea, 0xfe, 0xd3, 0x41, 0xb4, 0x9d, 0x3f, 0x1c, 0x68, 0x63, 0x5a, 0x64,
+	0x3c, 0x2d, 0xe8, 0x6f, 0xf3, 0xb1, 0x03, 0xc0, 0xaa, 0x59, 0x30, 0x55, 0xcb, 0xee, 0xe6, 0x43,
+	0x12, 0x59, 0xb8, 0x06, 0x43, 0xdb, 0xe0, 0x93, 0x32, 0x20, 0xa3, 0xa2, 0x0c, 0xb4, 0x0a, 0x2e,
+	0xb2, 0xf0, 0x1c, 0x84, 0x5e, 0x42, 0xe7, 0xba, 0x16, 0x8f, 0xf9, 0xfb, 0xfc, 0x6f, 0x48, 0xf5,
+	0xe4, 0x22, 0x0b, 0x37, 0xa0, 0x92, 0x9a, 0xd7, 0x22, 0xea, 0xb5, 0x1a, 0xd4, 0x7a, 0x7a, 0x92,
+	0x5a, 0x87, 0x4a, 0x6a, 0x56, 0x4b, 0xb3, 0xe7, 0x35, 0xa8, 0xf5, 0xa0, 0x25, 0xb5, 0x0e, 0x9d,
+	0xdb, 0xb7, 0xf9, 0x1a, 0xfc, 0x6a, 0x4a, 0x91, 0x07, 0xce, 0xd9, 0x38, 0xb0, 0x50, 0x1b, 0xdc,
+	0xfd, 0x93, 0x4f, 0x1f, 0x03, 0x5b, 0xae, 0x8e, 0x0f, 0xde, 0x4d, 0x02, 0x07, 0xf9, 0xd0, 0xc2,
+	0x47, 0x87, 0xd1, 0x24, 0x58, 0x92, 0x87, 0xa7, 0x93, 0x93, 0x71, 0xe0, 0x8e, 0x76, 0xc1, 0x3d,
+	0x94, 0x5f, 0xbd, 0x21, 0x78, 0xa7, 0x22, 0xa7, 0x24, 0x41, 0xdd, 0x4a, 0xb9, 0x9a, 0x8e, 0xf5,
+	0xb5, 0x6a, 0xaf, 0x23, 0x0a, 0xad, 0xbe, 0xbd, 0x6d, 0x9f, 0x7b, 0xea, 0x74, 0xe7, 0x57, 0x00,
+	0x00, 0x00, 0xff, 0xff, 0xa9, 0x8f, 0x6c, 0x8b, 0xc1, 0x05, 0x00, 0x00,
 }
 
 // Reference imports to suppress errors if they are not otherwise used.

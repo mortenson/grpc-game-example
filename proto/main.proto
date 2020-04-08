@@ -15,11 +15,6 @@ message Coordinate {
     int32 y = 2;
 }
 
-message Player {
-    string player = 1;
-    Coordinate position = 2;
-}
-
 enum Direction {
     UP = 0;
     DOWN = 1;
@@ -28,46 +23,51 @@ enum Direction {
     STOP = 4;
 }
 
+message Player {
+    string id = 1;
+    string name = 2;
+    Coordinate position = 3;
+}
+
+message Laser {
+    string id = 1;
+    Direction direction = 2;
+    google.protobuf.Timestamp startTime = 3;
+    Coordinate initialPosition = 4;
+}
+
 // Message actions.
 
+message Entity {
+    oneof entity {
+        Player player = 2;
+        Laser laser = 3;
+    }
+}
+
 message Connect {
-    string player = 1;
+    string id = 1;
+    string name = 2;
 }
 
 message Initialize {
     Coordinate position = 1;
-    repeated Player players = 2;
-    repeated Laser lasers = 3;
+    repeated Entity entities = 2;
 }
 
 message Move {
     Direction direction = 1;
 }
 
-message Laser {
-    Direction direction = 1;
-    string uuid = 2;
-    google.protobuf.Timestamp starttime = 3;
-    Coordinate position = 4;
+message AddEntity {
+    Entity entity = 1;
 }
 
-message AddPlayer {
-    Coordinate position = 1;
+message UpdateEntity {
+    Entity entity = 1;
 }
 
-message UpdatePlayer {
-    Coordinate position = 1;
-}
-
-message RemovePlayer {}
-
-message AddLaser {
-    Laser laser = 1;
-}
-
-message RemoveLaser {
-    string uuid = 1;
-}
+message RemoveEntity {}
 
 message PlayerKilled {
     Coordinate spawnPosition = 1;
@@ -84,14 +84,12 @@ message Request {
 }
 
 message Response {
-    string player = 1;
+    string id = 1;
     oneof action {
-        Initialize initialize = 3;
-        AddPlayer addplayer = 4;
-        UpdatePlayer updateplayer = 5;
-        RemovePlayer removeplayer = 6;
-        AddLaser addlaser = 7;
-        RemoveLaser removelaser = 8;
-        PlayerKilled playerkilled = 9;
+        Initialize initialize = 2;
+        AddEntity addEntity = 3;
+        UpdateEntity updateEntity = 4;
+        RemoveEntity removeEntity = 5;
+        PlayerKilled playerKilled = 6;
     }
 }

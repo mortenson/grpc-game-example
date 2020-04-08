@@ -2,7 +2,6 @@ package backend
 
 import (
 	"fmt"
-	"math"
 	"sync"
 	"time"
 
@@ -157,61 +156,10 @@ func (e IdentifierBase) ID() uuid.UUID {
 	return e.UUID
 }
 
-type PlayerState int
-
-const (
-	PlayerAlive PlayerState = iota
-	PlayerDead
-)
-
-// Player contains information unique to local and remote players.
-type Player struct {
-	IdentifierBase
-	Positioner
-	Mover
-	position Coordinate
-	Name     string
-	Icon     rune
-	State    PlayerState
-}
-
-func (p *Player) Position() Coordinate {
-	return p.position
-}
-
-func (p *Player) Move(c Coordinate) {
-	p.position = c
-}
-
-type Laser struct {
-	IdentifierBase
-	Positioner
-	InitialPosition Coordinate
-	Direction       Direction
-	StartTime       time.Time
-}
-
-func (laser *Laser) Position() Coordinate {
-	difference := time.Now().Sub(laser.StartTime)
-	moves := int(math.Floor(float64(difference.Milliseconds()) / float64(20)))
-	position := laser.InitialPosition
-	switch laser.Direction {
-	case DirectionUp:
-		position.Y -= moves
-	case DirectionDown:
-		position.Y += moves
-	case DirectionLeft:
-		position.X -= moves
-	case DirectionRight:
-		position.X += moves
-	}
-	return position
-}
-
 // Change is sent by the game engine in response to Actions.
 type Change interface{}
 
-// PositionChange is sent when the game engine moves a player.
+// PositionChange is sent when the game engine moves an entity.
 type PositionChange struct {
 	Change
 	ID        uuid.UUID
@@ -219,19 +167,12 @@ type PositionChange struct {
 	Position  Coordinate
 }
 
-type PlayerKilledChange struct {
+type AddEntityChange struct {
 	Change
-	PlayerName    string
-	SpawnPosition Coordinate
+	Entity Identifier
 }
 
-type LaserChange struct {
-	Change
-	ID    uuid.UUID
-	Laser Laser
-}
-
-type LaserRemoveChange struct {
+type RemoveEntityChange struct {
 	Change
 	ID uuid.UUID
 }
@@ -260,7 +201,7 @@ func (action MoveAction) Perform(game *Game) {
 		return
 	}
 	position := entity.(Positioner).Position()
-	// Move the player.
+	// Move the entity.
 	switch action.Direction {
 	case DirectionUp:
 		position.Y--
@@ -272,56 +213,11 @@ func (action MoveAction) Perform(game *Game) {
 		position.X++
 	}
 	entity.(Mover).Move(position)
-	// Inform the client that the player moved.
+	// Inform the client that the entity moved.
 	change := PositionChange{
 		ID:        entity.ID(),
 		Direction: action.Direction,
 		Position:  position,
-	}
-	select {
-	case game.ChangeChannel <- change:
-		// no-op.
-	default:
-		// no-op.
-	}
-	game.UpdateLastActionTime(actionKey)
-}
-
-type LaserAction struct {
-	Direction Direction
-	OwnerID   uuid.UUID
-}
-
-func (action LaserAction) Perform(game *Game) {
-	entity := game.GetEntity(action.OwnerID)
-	if entity == nil {
-		return
-	}
-	actionKey := fmt.Sprintf("%T:%s", action, entity.ID().String())
-	if !game.CheckLastActionTime(actionKey, 500) {
-		return
-	}
-	laser := Laser{
-		InitialPosition: entity.(Positioner).Position(),
-		StartTime:       time.Now(),
-		Direction:       action.Direction,
-		IdentifierBase:  IdentifierBase{uuid.New()},
-	}
-	// Initialize the laser to the side of the player.
-	switch action.Direction {
-	case DirectionUp:
-		laser.InitialPosition.Y--
-	case DirectionDown:
-		laser.InitialPosition.Y++
-	case DirectionLeft:
-		laser.InitialPosition.X--
-	case DirectionRight:
-		laser.InitialPosition.X++
-	}
-	game.AddEntity(&laser)
-	change := LaserChange{
-		Laser: laser,
-		ID:    laser.ID(),
 	}
 	select {
 	case game.ChangeChannel <- change:

@@ -56,9 +56,9 @@ func (c *GameClient) Start() {
 			case backend.PositionChange:
 				change := change.(backend.PositionChange)
 				c.HandlePositionChange(change)
-			case backend.LaserChange:
-				change := change.(backend.LaserChange)
-				c.HandleLaserChange(change)
+			case backend.AddEntityChange:
+				change := change.(backend.AddEntityChange)
+				c.HandleAddEntityChange(change)
 			}
 		}
 	}()
@@ -106,16 +106,29 @@ func (c *GameClient) HandlePositionChange(change backend.PositionChange) {
 	c.Stream.Send(&req)
 }
 
-func (c *GameClient) HandleLaserChange(change backend.LaserChange) {
-	req := proto.Request{
-		Action: &proto.Request_Laser{
-			Laser: &proto.Laser{
-				Direction: proto.GetProtoDirection(change.Laser.Direction),
-				Uuid:      change.UUID.String(),
+func (c *GameClient) HandleAddEntityChange(change backend.AddEntityChange) {
+	switch change.Entity.(type) {
+	case backend.Laser:
+		laser := change.Entity.(backend.Laser)
+		timestamp, err := ptypes.TimestampProto(laser.StartTime)
+		if err != nil {
+			// @todo handle
+			return
+		}
+		req := proto.Request{
+			Action: &proto.Request_Laser{
+				Laser: &proto.Laser{
+					Direction:       proto.GetProtoDirection(laser.Direction),
+					Id:              laser.ID().String(),
+					Starttime:       timestamp,
+					InitialPosition: proto.GetProtoCoordinate(laser.InitialPosition),
+				},
 			},
-		},
+		}
+		c.Stream.Send(&req)
+	default:
+		return
 	}
-	c.Stream.Send(&req)
 }
 
 // HandleInitializeResponse initializes the local player with information
@@ -126,7 +139,10 @@ func (c *GameClient) HandleInitializeResponse(resp *proto.Response) {
 	init := resp.GetInitialize()
 	c.CurrentPlayer.Position = proto.GetBackendCoordinate(init.Position)
 	c.Game.Players[c.CurrentPlayer.Name] = c.CurrentPlayer
-	for _, player := range init.Players {
+	for _, entity := range init.Entities {
+		switch entity.Entity.(type) {
+			case proto.
+		}
 		c.Game.Players[player.Player] = &backend.Player{
 			Position: proto.GetBackendCoordinate(player.Position),
 			Name:     player.Player,
