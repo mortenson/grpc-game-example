@@ -115,8 +115,8 @@ func (game *Game) CheckLastActionTime(actionKey string, throttle int) bool {
 
 func (game *Game) UpdateLastActionTime(actionKey string) {
 	game.Mu.Lock()
-	defer game.Mu.Unlock()
 	game.LastAction[actionKey] = time.Now()
+	game.Mu.Unlock()
 }
 
 // Coordinate is used for all position-related variables.
@@ -150,7 +150,6 @@ type Mover interface {
 }
 
 type IdentifierBase struct {
-	Identifier
 	UUID uuid.UUID
 }
 
@@ -306,7 +305,7 @@ func (action LaserAction) Perform(game *Game) {
 		InitialPosition: entity.(Positioner).Position(),
 		StartTime:       time.Now(),
 		Direction:       action.Direction,
-		IdentifierBase:  IdentifierBase{UUID: uuid.New()},
+		IdentifierBase:  IdentifierBase{uuid.New()},
 	}
 	// Initialize the laser to the side of the player.
 	switch action.Direction {
@@ -319,7 +318,7 @@ func (action LaserAction) Perform(game *Game) {
 	case DirectionRight:
 		laser.InitialPosition.X++
 	}
-	game.AddEntity(laser)
+	game.AddEntity(&laser)
 	change := LaserChange{
 		Laser: laser,
 		ID:    laser.ID(),
