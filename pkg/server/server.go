@@ -45,30 +45,9 @@ func (s *GameServer) Broadcast(resp *proto.Response) {
 // HandleConnectRequest processes new players.
 func (s *GameServer) HandleConnectRequest(req *proto.Request, srv proto.Game_StreamServer) uuid.UUID {
 	connect := req.GetConnect()
-	// Build a slice of current entities.
-	entities := make([]*proto.Entity, 0)
-	for _, entity := range s.Game.Entities {
-		protoEntity := proto.GetProtoEntity(entity)
-		if protoEntity != nil {
-			entities = append(entities, protoEntity)
-		}
-	}
+
 	// @todo Choose a start position away from other players?
 	startCoordinate := backend.Coordinate{X: 0, Y: 0}
-
-	// Send the client an initialize message.
-	resp := proto.Response{
-		Action: &proto.Response_Initialize{
-			Initialize: &proto.Initialize{
-				Position: proto.GetProtoCoordinate(startCoordinate),
-				Entities: entities,
-			},
-		},
-	}
-	if err := srv.Send(&resp); err != nil {
-		log.Printf("send error %v", err)
-	}
-	log.Printf("sent initialize message for %s", connect.Name)
 
 	// Add the new player.
 	playerID, err := uuid.Parse(connect.Id)
@@ -78,10 +57,32 @@ func (s *GameServer) HandleConnectRequest(req *proto.Request, srv proto.Game_Str
 	player := &backend.Player{
 		Name:           connect.Name,
 		Icon:           'P',
-		IdentifierBase: backend.IdentifierBase{playerID},
+		IdentifierBase: backend.IdentifierBase{UUID: playerID},
 	}
 	player.Move(startCoordinate)
 	s.Game.AddEntity(player)
+
+	// Build a slice of current entities.
+	entities := make([]*proto.Entity, 0)
+	for _, entity := range s.Game.Entities {
+		protoEntity := proto.GetProtoEntity(entity)
+		if protoEntity != nil {
+			entities = append(entities, protoEntity)
+		}
+	}
+
+	// Send the client an initialize message.
+	resp := proto.Response{
+		Action: &proto.Response_Initialize{
+			Initialize: &proto.Initialize{
+				Entities: entities,
+			},
+		},
+	}
+	if err := srv.Send(&resp); err != nil {
+		log.Printf("send error %v", err)
+	}
+	log.Printf("sent initialize message for %s", connect.Name)
 
 	// Inform all other clients of the new player.
 	resp = proto.Response{

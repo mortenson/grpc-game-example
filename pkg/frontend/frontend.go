@@ -4,6 +4,7 @@ import (
 	"time"
 
 	"github.com/gdamore/tcell"
+	"github.com/google/uuid"
 	"github.com/mortenson/grpc-game-example/pkg/backend"
 	"github.com/rivo/tview"
 )
@@ -12,7 +13,7 @@ import (
 type View struct {
 	Game          *backend.Game
 	App           *tview.Application
-	CurrentPlayer *backend.Player
+	CurrentPlayer uuid.UUID
 }
 
 // NewView construsts a new View struct.
@@ -60,7 +61,7 @@ func NewView(game *backend.Game) *View {
 	})
 	// Handle player movement input.
 	box.SetInputCapture(func(e *tcell.EventKey) *tcell.EventKey {
-		if view.CurrentPlayer == nil {
+		if view.CurrentPlayer.String() == "" {
 			return e
 		}
 		view.Game.Mu.RLock()
@@ -79,7 +80,7 @@ func NewView(game *backend.Game) *View {
 		}
 		if direction != backend.DirectionStop {
 			view.Game.ActionChannel <- backend.MoveAction{
-				ID:        view.CurrentPlayer.ID(),
+				ID:        view.CurrentPlayer,
 				Direction: direction,
 			}
 		}
@@ -97,7 +98,7 @@ func NewView(game *backend.Game) *View {
 		}
 		if laserDirection != backend.DirectionStop {
 			view.Game.ActionChannel <- backend.LaserAction{
-				OwnerID:   view.CurrentPlayer.ID(),
+				OwnerID:   view.CurrentPlayer,
 				Direction: laserDirection,
 			}
 		}

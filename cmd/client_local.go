@@ -8,11 +8,11 @@ import (
 
 func main() {
 	currentPlayer := backend.Player{
-		Name:           "Alice",
-		Icon:           'A',
-		IdentifierBase: backend.IdentifierBase{uuid.New()},
+		Name:            "Alice",
+		Icon:            'A',
+		IdentifierBase:  backend.IdentifierBase{uuid.New()},
+		CurrentPosition: backend.Coordinate{X: -1, Y: -5},
 	}
-	currentPlayer.Move(backend.Coordinate{X: -1, Y: -5})
 	game := backend.NewGame()
 	game.AddEntity(&currentPlayer)
 	view := frontend.NewView(game)
