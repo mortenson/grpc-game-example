@@ -92,6 +92,13 @@ func (game *Game) AddEntity(entity Identifier) {
 	game.Mu.Unlock()
 }
 
+func (game *Game) UpdateEntity(entity Identifier) {
+	// @todo is replacing the struct bad?
+	game.Mu.Lock()
+	game.Entities[entity.ID()] = entity
+	game.Mu.Unlock()
+}
+
 func (game *Game) GetEntity(id uuid.UUID) Identifier {
 	game.Mu.RLock()
 	defer game.Mu.RUnlock()

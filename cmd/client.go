@@ -6,6 +6,7 @@ import (
 	"math/rand"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/mortenson/grpc-game-example/pkg/backend"
 	"github.com/mortenson/grpc-game-example/pkg/client"
 	"github.com/mortenson/grpc-game-example/pkg/frontend"
@@ -52,8 +53,9 @@ func main() {
 		log.Fatalf("openn stream error %v", err)
 	}
 
+	playerID := uuid.New()
 	client := client.NewGameClient(stream, game, view)
-	client.Connect(playerName)
+	client.Connect(playerID, playerName)
 	client.Start()
 
 	view.Start()

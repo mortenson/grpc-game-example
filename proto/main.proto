@@ -81,11 +81,10 @@ message Request {
 }
 
 message Response {
-    string id = 1;
     oneof action {
-        Initialize initialize = 2;
-        AddEntity addEntity = 3;
-        UpdateEntity updateEntity = 4;
-        RemoveEntity removeEntity = 5;
+        Initialize initialize = 1;
+        AddEntity addEntity = 2;
+        UpdateEntity updateEntity = 3;
+        RemoveEntity removeEntity = 4;
     }
 }
