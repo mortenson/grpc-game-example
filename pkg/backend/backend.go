@@ -162,7 +162,7 @@ type Change interface{}
 // PositionChange is sent when the game engine moves an entity.
 type PositionChange struct {
 	Change
-	ID        uuid.UUID
+	Entity    Identifier
 	Direction Direction
 	Position  Coordinate
 }
@@ -174,7 +174,7 @@ type AddEntityChange struct {
 
 type RemoveEntityChange struct {
 	Change
-	ID uuid.UUID
+	Entity Identifier
 }
 
 // Action is sent by the client when attempting to change game state. The
@@ -215,7 +215,7 @@ func (action MoveAction) Perform(game *Game) {
 	entity.(Mover).Move(position)
 	// Inform the client that the entity moved.
 	change := PositionChange{
-		ID:        entity.ID(),
+		Entity:    entity,
 		Direction: action.Direction,
 		Position:  position,
 	}

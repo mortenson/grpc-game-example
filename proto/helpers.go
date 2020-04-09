@@ -50,24 +50,23 @@ func GetProtoCoordinate(coordinate backend.Coordinate) *Coordinate {
 	}
 }
 
-func GetBackendEntity(protoEntity isEntity_Entity) backend.Identifier {
-	switch protoEntity.(type) {
+func GetBackendEntity(protoEntity *Entity) backend.Identifier {
+	switch protoEntity.Entity.(type) {
 	case *Entity_Player:
-		protoPlayer := protoEntity.(*Entity_Player).Player
+		protoPlayer := protoEntity.Entity.(*Entity_Player).Player
 		entityID, err := uuid.Parse(protoPlayer.Id)
 		if err != nil {
 			// @todo handle
 			return nil
 		}
 		player := &backend.Player{
-			IdentifierBase: backend.IdentifierBase{entityID},
+			IdentifierBase: backend.IdentifierBase{UUID: entityID},
 			Name:           protoPlayer.Name,
 			Icon:           'P',
 		}
 		player.Move(GetBackendCoordinate(protoPlayer.Position))
 	case *Entity_Laser:
-		protoEntity = protoEntity.(*Entity_Laser)
-		protoLaser := protoEntity.(*Entity_Laser).Laser
+		protoLaser := protoEntity.Entity.(*Entity_Laser).Laser
 		entityID, err := uuid.Parse(protoLaser.Id)
 		if err != nil {
 			// @todo handle
@@ -79,7 +78,7 @@ func GetBackendEntity(protoEntity isEntity_Entity) backend.Identifier {
 			return nil
 		}
 		laser := &backend.Laser{
-			IdentifierBase:  backend.IdentifierBase{entityID},
+			IdentifierBase:  backend.IdentifierBase{UUID: entityID},
 			InitialPosition: GetBackendCoordinate(protoLaser.InitialPosition),
 			Direction:       GetBackendDirection(protoLaser.Direction),
 			StartTime:       timestamp,
@@ -89,7 +88,7 @@ func GetBackendEntity(protoEntity isEntity_Entity) backend.Identifier {
 	return nil
 }
 
-func GetProtoEntity(entity backend.Identifier) isEntity_Entity {
+func GetProtoEntity(entity backend.Identifier) *Entity {
 	switch entity.(type) {
 	case backend.Player:
 		player := entity.(backend.Player)
@@ -100,7 +99,7 @@ func GetProtoEntity(entity backend.Identifier) isEntity_Entity {
 				Position: GetProtoCoordinate(player.Position()),
 			},
 		}
-		return &protoPlayer
+		return &Entity{Entity: &protoPlayer}
 	case backend.Laser:
 		laser := entity.(backend.Laser)
 		timestamp, err := ptypes.TimestampProto(laser.StartTime)
@@ -115,7 +114,7 @@ func GetProtoEntity(entity backend.Identifier) isEntity_Entity {
 				InitialPosition: GetProtoCoordinate(laser.InitialPosition),
 			},
 		}
-		return &protoLaser
+		return &Entity{Entity: &protoLaser}
 	}
 	return nil
 }

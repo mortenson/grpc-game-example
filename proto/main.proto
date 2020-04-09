@@ -67,10 +67,8 @@ message UpdateEntity {
     Entity entity = 1;
 }
 
-message RemoveEntity {}
-
-message PlayerKilled {
-    Coordinate spawnPosition = 1;
+message RemoveEntity {
+    Entity entity = 1;
 }
 
 // Wraps multiple message actions.
@@ -90,6 +88,5 @@ message Response {
         AddEntity addEntity = 3;
         UpdateEntity updateEntity = 4;
         RemoveEntity removeEntity = 5;
-        PlayerKilled playerKilled = 6;
     }
 }

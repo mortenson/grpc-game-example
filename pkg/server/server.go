@@ -4,7 +4,6 @@ import (
 	"log"
 	"sync"
 
-	"github.com/golang/protobuf/ptypes"
 	"github.com/google/uuid"
 
 	"github.com/mortenson/grpc-game-example/pkg/backend"
@@ -51,7 +50,7 @@ func (s *GameServer) HandleConnectRequest(req *proto.Request, srv proto.Game_Str
 	for _, entity := range s.Game.Entities {
 		protoEntity := proto.GetProtoEntity(entity)
 		if protoEntity != nil {
-			entities = append(entities, &proto.Entity{Entity: protoEntity})
+			entities = append(entities, protoEntity)
 		}
 	}
 	// @todo Choose a start position away from other players?
@@ -87,16 +86,9 @@ func (s *GameServer) HandleConnectRequest(req *proto.Request, srv proto.Game_Str
 	// Inform all other clients of the new player.
 	resp = proto.Response{
 		Id: connect.Id,
-		Action: &proto.Response_Addentity{
-			Addentity: &proto.AddEntity{
-				Entity: &proto.Entity{
-					Entity: &proto.Entity_Player{
-						Player: &proto.Player{
-							Name:     player.Name,
-							Position: proto.GetProtoCoordinate(player.Position()),
-						},
-					},
-				},
+		Action: &proto.Response_AddEntity{
+			AddEntity: &proto.AddEntity{
+				Entity: proto.GetProtoEntity(player),
 			},
 		},
 	}
@@ -140,8 +132,8 @@ func (s *GameServer) RemoveClient(playerID uuid.UUID, srv proto.Game_StreamServe
 
 	resp := proto.Response{
 		Id: playerID.String(),
-		Action: &proto.Response_Removeentity{
-			Removeentity: &proto.RemoveEntity{},
+		Action: &proto.Response_RemoveEntity{
+			RemoveEntity: &proto.RemoveEntity{},
 		},
 	}
 	s.Broadcast(&resp)
@@ -189,54 +181,31 @@ func (s *GameServer) Stream(srv proto.Game_StreamServer) error {
 // HandlePositionChange broadcasts position changes to clients.
 func (s *GameServer) HandlePositionChange(change backend.PositionChange) {
 	resp := proto.Response{
-		Player: change.PlayerName,
-		Action: &proto.Response_Updateplayer{
-			Updateplayer: &proto.UpdatePlayer{
-				Position: proto.GetProtoCoordinate(change.Position),
+		Action: &proto.Response_UpdateEntity{
+			UpdateEntity: &proto.UpdateEntity{
+				Entity: proto.GetProtoEntity(change.Entity),
 			},
 		},
 	}
 	s.Broadcast(&resp)
 }
 
-func (s *GameServer) HandleLaserChange(change backend.LaserChange) {
-	timestamp, err := ptypes.TimestampProto(change.Laser.StartTime)
-	if err != nil {
-		// @todo handle
-		return
-	}
+func (s *GameServer) HandleAddEntityChange(change backend.AddEntityChange) {
 	resp := proto.Response{
-		Action: &proto.Response_Addlaser{
-			Addlaser: &proto.AddLaser{
-				Laser: &proto.Laser{
-					Direction: proto.GetProtoDirection(change.Laser.Direction),
-					Uuid:      change.UUID.String(),
-					Starttime: timestamp,
-					Position:  proto.GetProtoCoordinate(change.Laser.GetPosition()),
-				},
+		Action: &proto.Response_AddEntity{
+			AddEntity: &proto.AddEntity{
+				Entity: proto.GetProtoEntity(change.Entity),
 			},
 		},
 	}
 	s.Broadcast(&resp)
 }
 
-func (s *GameServer) HandleLaserRemoveChange(change backend.LaserRemoveChange) {
+func (s *GameServer) HandleRemoveEntityChange(change backend.RemoveEntityChange) {
 	resp := proto.Response{
-		Action: &proto.Response_Removelaser{
-			Removelaser: &proto.RemoveLaser{
-				Uuid: change.UUID.String(),
-			},
-		},
-	}
-	s.Broadcast(&resp)
-}
-
-func (s *GameServer) HandlePlayerKilledChange(change backend.PlayerKilledChange) {
-	resp := proto.Response{
-		Player: change.PlayerName,
-		Action: &proto.Response_Playerkilled{
-			Playerkilled: &proto.PlayerKilled{
-				SpawnPosition: proto.GetProtoCoordinate(change.SpawnPosition),
+		Action: &proto.Response_RemoveEntity{
+			RemoveEntity: &proto.RemoveEntity{
+				Entity: proto.GetProtoEntity(change.Entity),
 			},
 		},
 	}
@@ -252,15 +221,12 @@ func (s *GameServer) WatchChanges() {
 			case backend.PositionChange:
 				change := change.(backend.PositionChange)
 				s.HandlePositionChange(change)
-			case backend.LaserChange:
-				change := change.(backend.LaserChange)
-				s.HandleLaserChange(change)
-			case backend.LaserRemoveChange:
-				change := change.(backend.LaserRemoveChange)
-				s.HandleLaserRemoveChange(change)
-			case backend.PlayerKilledChange:
-				change := change.(backend.PlayerKilledChange)
-				s.HandlePlayerKilledChange(change)
+			case backend.AddEntityChange:
+				change := change.(backend.AddEntityChange)
+				s.HandleAddEntityChange(change)
+			case backend.RemoveEntityChange:
+				change := change.(backend.RemoveEntityChange)
+				s.HandleRemoveEntityChange(change)
 			}
 		}
 	}()
