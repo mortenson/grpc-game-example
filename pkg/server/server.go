@@ -64,12 +64,14 @@ func (s *GameServer) HandleConnectRequest(req *proto.Request, srv proto.Game_Str
 
 	// Build a slice of current entities.
 	entities := make([]*proto.Entity, 0)
+	s.Game.Mu.RLock()
 	for _, entity := range s.Game.Entities {
 		protoEntity := proto.GetProtoEntity(entity)
 		if protoEntity != nil {
 			entities = append(entities, protoEntity)
 		}
 	}
+	s.Game.Mu.RUnlock()
 
 	// Send the client an initialize message.
 	resp := proto.Response{
@@ -86,7 +88,6 @@ func (s *GameServer) HandleConnectRequest(req *proto.Request, srv proto.Game_Str
 
 	// Inform all other clients of the new player.
 	resp = proto.Response{
-		Id: connect.Id,
 		Action: &proto.Response_AddEntity{
 			AddEntity: &proto.AddEntity{
 				Entity: proto.GetProtoEntity(player),
@@ -132,9 +133,10 @@ func (s *GameServer) RemoveClient(playerID uuid.UUID, srv proto.Game_StreamServe
 	s.Game.RemoveEntity(playerID)
 
 	resp := proto.Response{
-		Id: playerID.String(),
 		Action: &proto.Response_RemoveEntity{
-			RemoveEntity: &proto.RemoveEntity{},
+			RemoveEntity: &proto.RemoveEntity{
+				Id: playerID.String(),
+			},
 		},
 	}
 	s.Broadcast(&resp)
@@ -206,7 +208,7 @@ func (s *GameServer) HandleRemoveEntityChange(change backend.RemoveEntityChange)
 	resp := proto.Response{
 		Action: &proto.Response_RemoveEntity{
 			RemoveEntity: &proto.RemoveEntity{
-				Entity: proto.GetProtoEntity(change.Entity),
+				Id: change.Entity.ID().String(),
 			},
 		},
 	}

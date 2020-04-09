@@ -63,6 +63,7 @@ func (c *GameClient) Start() {
 	go func() {
 		for {
 			resp, err := c.Stream.Recv()
+			log.Print("Recv %+v", resp)
 			if err == io.EOF {
 				log.Fatalf("EOF")
 				return
@@ -136,6 +137,10 @@ func (c *GameClient) HandleUpdateEntityResponse(resp *proto.Response) {
 
 func (c *GameClient) HandleRemoveEntityResponse(resp *proto.Response) {
 	remove := resp.GetRemoveEntity()
-	entity := proto.GetBackendEntity(remove.Entity)
-	c.Game.RemoveEntity(entity.ID())
+	id, err := uuid.Parse(remove.Id)
+	if err != nil {
+		// @todo handle
+		return
+	}
+	c.Game.RemoveEntity(id)
 }

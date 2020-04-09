@@ -64,8 +64,6 @@ func NewView(game *backend.Game) *View {
 		if view.CurrentPlayer.String() == "" {
 			return e
 		}
-		view.Game.Mu.RLock()
-		defer view.Game.Mu.RUnlock()
 		// Movement
 		direction := backend.DirectionStop
 		switch e.Key() {

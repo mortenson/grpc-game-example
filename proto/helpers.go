@@ -118,38 +118,3 @@ func GetProtoEntity(entity backend.Identifier) *Entity {
 	}
 	return nil
 }
-
-func GetAddResponse(id string, entity isEntity_Entity) Response {
-	return Response{
-		Id: id,
-		Action: &Response_AddEntity{
-			AddEntity: &AddEntity{
-				Entity: &Entity{
-					Entity: entity,
-				},
-			},
-		},
-	}
-}
-
-func GetUpdateResponse(id string, entity isEntity_Entity) Response {
-	return Response{
-		Id: id,
-		Action: &Response_UpdateEntity{
-			UpdateEntity: &UpdateEntity{
-				Entity: &Entity{
-					Entity: entity,
-				},
-			},
-		},
-	}
-}
-
-func GetRemoveResponse(id string) Response {
-	return Response{
-		Id: id,
-		Action: &Response_RemoveEntity{
-			RemoveEntity: &RemoveEntity{},
-		},
-	}
-}

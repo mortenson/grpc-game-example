@@ -16,7 +16,7 @@ func main() {
 	game := backend.NewGame()
 	game.AddEntity(&currentPlayer)
 	view := frontend.NewView(game)
-	view.CurrentPlayer = &currentPlayer
+	view.CurrentPlayer = currentPlayer.ID()
 
 	game.Start()
 	view.Start()

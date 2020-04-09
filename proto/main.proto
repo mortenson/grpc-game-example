@@ -67,7 +67,7 @@ message UpdateEntity {
 }
 
 message RemoveEntity {
-    Entity entity = 1;
+    string id = 1;
 }
 
 // Wraps multiple message actions.
