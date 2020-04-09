@@ -40,9 +40,9 @@ func (game *Game) Start() {
 		}
 	}()
 	// Respond to laser collisions.
-	go func() {
+	/*go func() {
 		for {
-			/*game.Mux.Lock()
+			game.Mux.Lock()
 			for id, laser := range game.Lasers {
 				laserPosition := laser.GetPosition()
 				didCollide := false
@@ -80,10 +80,10 @@ func (game *Game) Start() {
 					}
 				}
 			}
-			game.Mux.Unlock()*/
+			game.Mux.Unlock()
 			time.Sleep(time.Millisecond * 20)
 		}
-	}()
+	}()*/
 }
 
 func (game *Game) AddEntity(entity Identifier) {
@@ -112,7 +112,9 @@ func (game *Game) RemoveEntity(id uuid.UUID) {
 }
 
 func (game *Game) CheckLastActionTime(actionKey string, throttle int) bool {
+	game.Mu.RLock()
 	lastAction, ok := game.LastAction[actionKey]
+	game.Mu.RUnlock()
 	if ok && lastAction.After(time.Now().Add(-1*time.Duration(throttle)*time.Millisecond)) {
 		return false
 	}

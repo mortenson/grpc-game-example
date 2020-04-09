@@ -14,14 +14,16 @@ type View struct {
 	Game          *backend.Game
 	App           *tview.Application
 	CurrentPlayer uuid.UUID
+	Paused        bool
 }
 
 // NewView construsts a new View struct.
 func NewView(game *backend.Game) *View {
 	app := tview.NewApplication()
 	view := &View{
-		Game: game,
-		App:  app,
+		Game:   game,
+		App:    app,
+		Paused: false,
 	}
 	box := tview.NewBox().SetBorder(true).SetTitle("grpc-game-example")
 	box.SetDrawFunc(func(screen tcell.Screen, x int, y int, width int, height int) (int, int, int, int) {
@@ -61,7 +63,7 @@ func NewView(game *backend.Game) *View {
 	})
 	// Handle player movement input.
 	box.SetInputCapture(func(e *tcell.EventKey) *tcell.EventKey {
-		if view.CurrentPlayer.String() == "" {
+		if view.Paused {
 			return e
 		}
 		// Movement
@@ -111,6 +113,9 @@ func (view *View) Start() error {
 	// Main loop - re-draw at ~60 FPS.
 	go func() {
 		for {
+			if view.Paused {
+				continue
+			}
 			view.App.Draw()
 			time.Sleep(17 * time.Microsecond)
 		}

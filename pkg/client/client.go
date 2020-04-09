@@ -30,6 +30,7 @@ func NewGameClient(stream proto.Game_StreamClient, game *backend.Game, view *fro
 
 // Connect connects a new player to the server.
 func (c *GameClient) Connect(playerID uuid.UUID, playerName string) {
+	c.View.Paused = true
 	c.CurrentPlayer = playerID
 	req := proto.Request{
 		Action: &proto.Request_Connect{
@@ -46,7 +47,7 @@ func (c *GameClient) Connect(playerID uuid.UUID, playerName string) {
 // changes.
 func (c *GameClient) Start() {
 	// Handle local game engine changes.
-	go func() {
+	/*go func() {
 		for {
 			change := <-c.Game.ChangeChannel
 			switch change.(type) {
@@ -58,12 +59,11 @@ func (c *GameClient) Start() {
 				c.HandleAddEntityChange(change)
 			}
 		}
-	}()
+	}()*/
 	// Handle stream messages.
 	go func() {
 		for {
 			resp, err := c.Stream.Recv()
-			log.Print("Recv %+v", resp)
 			if err == io.EOF {
 				log.Fatalf("EOF")
 				return
@@ -121,6 +121,7 @@ func (c *GameClient) HandleInitializeResponse(resp *proto.Response) {
 		c.Game.AddEntity(proto.GetBackendEntity(entity))
 	}
 	c.View.CurrentPlayer = c.CurrentPlayer
+	c.View.Paused = false
 }
 
 func (c *GameClient) HandleAddEntityResponse(resp *proto.Response) {

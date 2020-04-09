@@ -3,6 +3,7 @@ package server
 import (
 	"log"
 	"sync"
+	"time"
 
 	"github.com/google/uuid"
 
@@ -73,6 +74,8 @@ func (s *GameServer) HandleConnectRequest(req *proto.Request, srv proto.Game_Str
 	}
 	s.Game.Mu.RUnlock()
 
+	// @todo handle cases where connection is too fast
+	time.Sleep(time.Second * 1)
 	// Send the client an initialize message.
 	resp := proto.Response{
 		Action: &proto.Response_Initialize{
@@ -147,6 +150,7 @@ func (s *GameServer) Stream(srv proto.Game_StreamServer) error {
 	log.Println("start new server")
 	ctx := srv.Context()
 	var playerID uuid.UUID
+	isConnected := false
 	for {
 		select {
 		case <-ctx.Done():
@@ -157,7 +161,7 @@ func (s *GameServer) Stream(srv proto.Game_StreamServer) error {
 		req, err := srv.Recv()
 		if err != nil {
 			log.Printf("receive error %v", err)
-			if playerID.String() != "" {
+			if isConnected {
 				s.RemoveClient(playerID, srv)
 			}
 			continue
@@ -165,10 +169,10 @@ func (s *GameServer) Stream(srv proto.Game_StreamServer) error {
 
 		if req.GetConnect() != nil {
 			playerID = s.HandleConnectRequest(req, srv)
+			isConnected = true
 		}
 
-		// A local variable is used to track the current player.
-		if playerID.String() == "" {
+		if !isConnected {
 			continue
 		}
 
