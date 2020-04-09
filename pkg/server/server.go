@@ -166,6 +166,7 @@ func (s *GameServer) Stream(srv proto.Game_StreamServer) error {
 			}
 			continue
 		}
+		log.Printf("got message %+v", req)
 
 		if req.GetConnect() != nil {
 			playerID = s.HandleConnectRequest(req, srv)

@@ -47,7 +47,7 @@ func (c *GameClient) Connect(playerID uuid.UUID, playerName string) {
 // changes.
 func (c *GameClient) Start() {
 	// Handle local game engine changes.
-	/*go func() {
+	go func() {
 		for {
 			change := <-c.Game.ChangeChannel
 			switch change.(type) {
@@ -59,7 +59,7 @@ func (c *GameClient) Start() {
 				c.HandleAddEntityChange(change)
 			}
 		}
-	}()*/
+	}()
 	// Handle stream messages.
 	go func() {
 		for {
@@ -98,18 +98,17 @@ func (c *GameClient) HandlePositionChange(change backend.PositionChange) {
 	c.Stream.Send(&req)
 }
 
+// @todo Is this the right way to respond to changes?
 func (c *GameClient) HandleAddEntityChange(change backend.AddEntityChange) {
 	switch change.Entity.(type) {
-	case backend.Laser:
-		laser := change.Entity.(backend.Laser)
+	case *backend.Laser:
+		laser := change.Entity.(*backend.Laser)
 		req := proto.Request{
 			Action: &proto.Request_Laser{
 				Laser: proto.GetProtoEntity(laser).GetLaser(),
 			},
 		}
 		c.Stream.Send(&req)
-	default:
-		return
 	}
 }
 
@@ -118,7 +117,12 @@ func (c *GameClient) HandleAddEntityChange(change backend.AddEntityChange) {
 func (c *GameClient) HandleInitializeResponse(resp *proto.Response) {
 	init := resp.GetInitialize()
 	for _, entity := range init.Entities {
-		c.Game.AddEntity(proto.GetBackendEntity(entity))
+		backendEntity := proto.GetBackendEntity(entity)
+		if backendEntity == nil {
+			// @todo handle
+			return
+		}
+		c.Game.AddEntity(backendEntity)
 	}
 	c.View.CurrentPlayer = c.CurrentPlayer
 	c.View.Paused = false
@@ -127,12 +131,20 @@ func (c *GameClient) HandleInitializeResponse(resp *proto.Response) {
 func (c *GameClient) HandleAddEntityResponse(resp *proto.Response) {
 	add := resp.GetAddEntity()
 	entity := proto.GetBackendEntity(add.Entity)
+	if entity == nil {
+		// @todo handle
+		return
+	}
 	c.Game.AddEntity(entity)
 }
 
 func (c *GameClient) HandleUpdateEntityResponse(resp *proto.Response) {
 	update := resp.GetUpdateEntity()
 	entity := proto.GetBackendEntity(update.Entity)
+	if entity == nil {
+		// @todo handle
+		return
+	}
 	c.Game.UpdateEntity(entity)
 }
 
