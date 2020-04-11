@@ -17,6 +17,8 @@ type Game struct {
 	ActionChannel   chan Action
 	LastAction      map[string]time.Time
 	Score           map[uuid.UUID]int
+	NewRoundAt      time.Time
+	WaitForRound    bool
 	IsAuthoritative bool
 }
 
@@ -28,6 +30,7 @@ func NewGame() *Game {
 		LastAction:      make(map[string]time.Time),
 		ChangeChannel:   make(chan Change, 1),
 		IsAuthoritative: true,
+		WaitForRound:    false,
 		Score:           make(map[uuid.UUID]int),
 	}
 	return &game
@@ -40,13 +43,18 @@ func (game *Game) Start() {
 	go func() {
 		for {
 			action := <-game.ActionChannel
+			if game.WaitForRound {
+				continue
+			}
 			action.Perform(game)
 		}
 	}()
-	// Respond to laser collisions.
+	// If the game isn't authoritative, some other system determines when
+	// players are hit.
 	if !game.IsAuthoritative {
 		return
 	}
+	// Check for player death.
 	go func() {
 		for {
 			collisionMap := make(map[Coordinate][]Positioner)
@@ -101,11 +109,8 @@ func (game *Game) Start() {
 							default:
 								// no-op.
 							}
-							// Change score.
 							if player.ID() != laserOwnerID {
-								game.Mu.Lock()
-								game.Score[laserOwnerID]++
-								game.Mu.Unlock()
+								game.AddScore(laserOwnerID)
 							}
 						}
 					}
@@ -138,6 +143,23 @@ func (game *Game) GetEntity(id uuid.UUID) Identifier {
 func (game *Game) RemoveEntity(id uuid.UUID) {
 	game.Mu.Lock()
 	delete(game.Entities, id)
+	game.Mu.Unlock()
+}
+
+func (game *Game) AddScore(id uuid.UUID) {
+	game.Mu.Lock()
+	game.Score[id]++
+	if game.Score[id] >= 10 {
+		game.Score = make(map[uuid.UUID]int)
+		game.WaitForRound = true
+		game.NewRoundAt = time.Now().Add(time.Second * 10)
+		// @todo add wait for round change
+		go func() {
+			time.Sleep(time.Second * 10)
+			game.WaitForRound = false
+			// @todo add start round change
+		}()
+	}
 	game.Mu.Unlock()
 }
 

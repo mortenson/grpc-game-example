@@ -14,6 +14,8 @@ import (
 type View struct {
 	Game          *backend.Game
 	App           *tview.Application
+	Pages         *tview.Pages
+	RoundWait     *tview.TextView
 	CurrentPlayer uuid.UUID
 	Paused        bool
 }
@@ -26,7 +28,11 @@ func NewView(game *backend.Game) *View {
 		Game:   game,
 		App:    app,
 		Paused: false,
+		Pages:  pages,
 	}
+	roundWait := tview.NewTextView()
+	roundWait.SetTextAlign(tview.AlignCenter).SetBorder(true).SetTitle("round complete")
+	view.RoundWait = roundWait
 	score := tview.NewTextView()
 	score.SetBorder(true).SetTitle("score")
 	updateScore := func() {
@@ -128,6 +134,7 @@ func NewView(game *backend.Game) *View {
 	})
 	pages.AddPage("viewport", box, true, true)
 	pages.AddPage("score", score, true, false)
+	pages.AddPage("roundwait", roundWait, true, false)
 	app.SetInputCapture(func(e *tcell.EventKey) *tcell.EventKey {
 		if e.Rune() == 'p' {
 			updateScore()
@@ -149,6 +156,16 @@ func (view *View) Start() error {
 		for {
 			if view.Paused {
 				continue
+			}
+			if view.Game.WaitForRound {
+				view.Pages.ShowPage("roundwait")
+				seconds := int(view.Game.NewRoundAt.Sub(time.Now()).Seconds())
+				if seconds < 0 {
+					seconds = 0
+				}
+				view.RoundWait.SetText(fmt.Sprintf("New round in %d seconds...", seconds))
+			} else {
+				view.Pages.HidePage("roundwait")
 			}
 			view.App.Draw()
 			time.Sleep(17 * time.Microsecond)
