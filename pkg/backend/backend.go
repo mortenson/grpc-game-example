@@ -16,6 +16,7 @@ type Game struct {
 	ChangeChannel   chan Change
 	ActionChannel   chan Action
 	LastAction      map[string]time.Time
+	Score           map[uuid.UUID]int
 	IsAuthoritative bool
 }
 
@@ -27,6 +28,7 @@ func NewGame() *Game {
 		LastAction:      make(map[string]time.Time),
 		ChangeChannel:   make(chan Change, 1),
 		IsAuthoritative: true,
+		Score:           make(map[uuid.UUID]int),
 	}
 	return &game
 }
@@ -63,10 +65,12 @@ func (game *Game) Start() {
 					continue
 				}
 				hasLaser := false
+				var laserOwnerID uuid.UUID
 				for _, entity := range entities {
-					_, ok := entity.(*Laser)
+					laser, ok := entity.(*Laser)
 					if ok {
 						hasLaser = true
+						laserOwnerID = laser.ID()
 						break
 					}
 				}
@@ -87,7 +91,7 @@ func (game *Game) Start() {
 							game.RemoveEntity(laser.ID())
 						case *Player:
 							player := entity.(*Player)
-							player.Move(Coordinate{X: 0, Y: 0})
+							game.Move(player.ID(), Coordinate{X: 0, Y: 0})
 							change := PlayerRespawnChange{
 								Player: player,
 							}
@@ -96,6 +100,10 @@ func (game *Game) Start() {
 								// no-op.
 							default:
 								// no-op.
+							}
+							// Change score.
+							if player.ID() != laserOwnerID {
+								game.Score[laserOwnerID]++
 							}
 						}
 					}
@@ -128,6 +136,12 @@ func (game *Game) GetEntity(id uuid.UUID) Identifier {
 func (game *Game) RemoveEntity(id uuid.UUID) {
 	game.Mu.Lock()
 	delete(game.Entities, id)
+	game.Mu.Unlock()
+}
+
+func (game *Game) Move(id uuid.UUID, position Coordinate) {
+	game.Mu.Lock()
+	game.Entities[id].(Mover).Move(position)
 	game.Mu.Unlock()
 }
 
@@ -246,7 +260,7 @@ func (action MoveAction) Perform(game *Game) {
 	case DirectionRight:
 		position.X++
 	}
-	entity.(Mover).Move(position)
+	game.Move(entity.ID(), position)
 	// Inform the client that the entity moved.
 	change := MoveChange{
 		Entity:    entity,

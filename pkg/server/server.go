@@ -56,11 +56,11 @@ func (s *GameServer) HandleConnectRequest(req *proto.Request, srv proto.Game_Str
 		// @todo handle
 	}
 	player := &backend.Player{
-		Name:           connect.Name,
-		Icon:           'P',
-		IdentifierBase: backend.IdentifierBase{UUID: playerID},
+		Name:            connect.Name,
+		Icon:            'P',
+		IdentifierBase:  backend.IdentifierBase{UUID: playerID},
+		CurrentPosition: startCoordinate,
 	}
-	player.Move(startCoordinate)
 	s.Game.AddEntity(player)
 
 	// Build a slice of current entities.

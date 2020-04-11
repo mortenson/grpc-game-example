@@ -14,6 +14,7 @@ type Laser struct {
 	InitialPosition Coordinate
 	Direction       Direction
 	StartTime       time.Time
+	OwnerID         uuid.UUID
 }
 
 func (laser *Laser) Position() Coordinate {
@@ -53,6 +54,7 @@ func (action LaserAction) Perform(game *Game) {
 		StartTime:       time.Now(),
 		Direction:       action.Direction,
 		IdentifierBase:  IdentifierBase{action.ID},
+		OwnerID:         action.OwnerID,
 	}
 	// Initialize the laser to the side of the player.
 	switch action.Direction {
