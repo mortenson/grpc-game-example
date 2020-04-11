@@ -34,6 +34,7 @@ message Laser {
     Direction direction = 2;
     google.protobuf.Timestamp startTime = 3;
     Coordinate initialPosition = 4;
+    string ownerId = 5;
 }
 
 // Message actions.

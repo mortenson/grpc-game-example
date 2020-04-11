@@ -1,6 +1,7 @@
 package frontend
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/gdamore/tcell"
@@ -20,15 +21,33 @@ type View struct {
 // NewView construsts a new View struct.
 func NewView(game *backend.Game) *View {
 	app := tview.NewApplication()
+	pages := tview.NewPages()
 	view := &View{
 		Game:   game,
 		App:    app,
 		Paused: false,
 	}
+	score := tview.NewTextView()
+	score.SetBorder(true).SetTitle("score")
+	updateScore := func() {
+		text := ""
+		game.Mu.RLock()
+		for _, entity := range view.Game.Entities {
+			player, ok := entity.(*backend.Player)
+			if !ok {
+				continue
+			}
+			score, ok := view.Game.Score[player.ID()]
+			if !ok {
+				score = 0
+			}
+			text += fmt.Sprintf("%s - %d\n", player.Name, score)
+		}
+		game.Mu.RUnlock()
+		score.SetText(text)
+	}
 	box := tview.NewBox().SetBorder(true).SetTitle("grpc-game-example")
 	box.SetDrawFunc(func(screen tcell.Screen, x int, y int, width int, height int) (int, int, int, int) {
-		view.Game.Mu.RLock()
-		defer view.Game.Mu.RUnlock()
 		width = width - 1
 		height = height - 1
 		centerY := y + height/2
@@ -39,6 +58,7 @@ func NewView(game *backend.Game) *View {
 			}
 		}
 		screen.SetContent(centerX, centerY, 'O', nil, tcell.StyleDefault.Foreground(tcell.ColorWhite))
+		view.Game.Mu.RLock()
 		for _, entity := range view.Game.Entities {
 			positioner, ok := entity.(backend.Positioner)
 			if !ok {
@@ -59,6 +79,7 @@ func NewView(game *backend.Game) *View {
 			}
 			screen.SetContent(centerX+position.X, centerY+position.Y, icon, nil, tcell.StyleDefault.Foreground(color))
 		}
+		view.Game.Mu.RUnlock()
 		return 0, 0, 0, 0
 	})
 	// Handle player movement input.
@@ -105,7 +126,19 @@ func NewView(game *backend.Game) *View {
 		}
 		return e
 	})
-	app.SetRoot(box, true).SetFocus(box)
+	pages.AddPage("viewport", box, true, true)
+	pages.AddPage("score", score, true, false)
+	app.SetInputCapture(func(e *tcell.EventKey) *tcell.EventKey {
+		if e.Rune() == 'p' {
+			updateScore()
+			pages.ShowPage("score")
+		}
+		if e.Key() == tcell.KeyESC {
+			pages.HidePage("score")
+		}
+		return e
+	})
+	app.SetRoot(pages, true)
 	return view
 }
 

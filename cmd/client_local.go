@@ -15,6 +15,12 @@ func main() {
 	}
 	game := backend.NewGame()
 	game.AddEntity(&currentPlayer)
+	game.AddEntity(&backend.Player{
+		Name:            "Bob",
+		Icon:            'B',
+		IdentifierBase:  backend.IdentifierBase{uuid.New()},
+		CurrentPosition: backend.Coordinate{X: 0, Y: 0},
+	})
 	view := frontend.NewView(game)
 	view.CurrentPlayer = currentPlayer.ID()
 
