@@ -56,40 +56,48 @@ func GetBackendEntity(protoEntity *Entity) backend.Identifier {
 	switch protoEntity.Entity.(type) {
 	case *Entity_Player:
 		protoPlayer := protoEntity.Entity.(*Entity_Player).Player
-		entityID, err := uuid.Parse(protoPlayer.Id)
-		if err != nil {
-			// @todo handle
-			return nil
-		}
-		player := &backend.Player{
-			IdentifierBase: backend.IdentifierBase{UUID: entityID},
-			Name:           protoPlayer.Name,
-			Icon:           'P',
-		}
-		player.Move(GetBackendCoordinate(protoPlayer.Position))
-		return player
+		return GetBackendPlayer(protoPlayer)
 	case *Entity_Laser:
 		protoLaser := protoEntity.Entity.(*Entity_Laser).Laser
-		entityID, err := uuid.Parse(protoLaser.Id)
-		if err != nil {
-			// @todo handle
-			return nil
-		}
-		timestamp, err := ptypes.Timestamp(protoLaser.StartTime)
-		if err != nil {
-			// @todo handle
-			return nil
-		}
-		laser := &backend.Laser{
-			IdentifierBase:  backend.IdentifierBase{UUID: entityID},
-			InitialPosition: GetBackendCoordinate(protoLaser.InitialPosition),
-			Direction:       GetBackendDirection(protoLaser.Direction),
-			StartTime:       timestamp,
-		}
-		return laser
+		return GetBackendLaser(protoLaser)
 	}
 	log.Fatalf("Cannot get backend entity for %T -> %+v", protoEntity, protoEntity)
 	return nil
+}
+
+func GetBackendPlayer(protoPlayer *Player) *backend.Player {
+	entityID, err := uuid.Parse(protoPlayer.Id)
+	if err != nil {
+		// @todo handle
+		return nil
+	}
+	player := &backend.Player{
+		IdentifierBase: backend.IdentifierBase{UUID: entityID},
+		Name:           protoPlayer.Name,
+		Icon:           'P',
+	}
+	player.Move(GetBackendCoordinate(protoPlayer.Position))
+	return player
+}
+
+func GetBackendLaser(protoLaser *Laser) *backend.Laser {
+	entityID, err := uuid.Parse(protoLaser.Id)
+	if err != nil {
+		// @todo handle
+		return nil
+	}
+	timestamp, err := ptypes.Timestamp(protoLaser.StartTime)
+	if err != nil {
+		// @todo handle
+		return nil
+	}
+	laser := &backend.Laser{
+		IdentifierBase:  backend.IdentifierBase{UUID: entityID},
+		InitialPosition: GetBackendCoordinate(protoLaser.InitialPosition),
+		Direction:       GetBackendDirection(protoLaser.Direction),
+		StartTime:       timestamp,
+	}
+	return laser
 }
 
 func GetProtoEntity(entity backend.Identifier) *Entity {
@@ -97,30 +105,38 @@ func GetProtoEntity(entity backend.Identifier) *Entity {
 	case *backend.Player:
 		player := entity.(*backend.Player)
 		protoPlayer := Entity_Player{
-			Player: &Player{
-				Id:       player.ID().String(),
-				Name:     player.Name,
-				Position: GetProtoCoordinate(player.Position()),
-			},
+			Player: GetProtoPlayer(player),
 		}
 		return &Entity{Entity: &protoPlayer}
 	case *backend.Laser:
 		laser := entity.(*backend.Laser)
-		timestamp, err := ptypes.TimestampProto(laser.StartTime)
-		if err != nil {
-			// @todo handle
-			return nil
-		}
 		protoLaser := Entity_Laser{
-			Laser: &Laser{
-				Id:              laser.ID().String(),
-				StartTime:       timestamp,
-				InitialPosition: GetProtoCoordinate(laser.InitialPosition),
-				Direction:       GetProtoDirection(laser.Direction),
-			},
+			Laser: GetProtoLaser(laser),
 		}
 		return &Entity{Entity: &protoLaser}
 	}
 	log.Fatalf("Cannot get proto entity for %T -> %+v", entity, entity)
 	return nil
+}
+
+func GetProtoPlayer(player *backend.Player) *Player {
+	return &Player{
+		Id:       player.ID().String(),
+		Name:     player.Name,
+		Position: GetProtoCoordinate(player.Position()),
+	}
+}
+
+func GetProtoLaser(laser *backend.Laser) *Laser {
+	timestamp, err := ptypes.TimestampProto(laser.StartTime)
+	if err != nil {
+		// @todo handle
+		return nil
+	}
+	return &Laser{
+		Id:              laser.ID().String(),
+		StartTime:       timestamp,
+		InitialPosition: GetProtoCoordinate(laser.InitialPosition),
+		Direction:       GetProtoDirection(laser.Direction),
+	}
 }

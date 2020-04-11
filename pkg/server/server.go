@@ -120,10 +120,16 @@ func (s *GameServer) HandleMoveRequest(playerID uuid.UUID, req *proto.Request, s
 }
 
 func (s *GameServer) HandleLaserRequest(playerID uuid.UUID, req *proto.Request, srv proto.Game_StreamServer) {
-	move := req.GetLaser()
+	laser := req.GetLaser()
+	id, err := uuid.Parse(laser.Id)
+	if err != nil {
+		// @todo handle
+		return
+	}
 	s.Game.ActionChannel <- backend.LaserAction{
 		OwnerID:   playerID,
-		Direction: proto.GetBackendDirection(move.Direction),
+		ID:        id,
+		Direction: proto.GetBackendDirection(laser.Direction),
 	}
 }
 
@@ -186,8 +192,7 @@ func (s *GameServer) Stream(srv proto.Game_StreamServer) error {
 	}
 }
 
-// HandlePositionChange broadcasts position changes to clients.
-func (s *GameServer) HandlePositionChange(change backend.PositionChange) {
+func (s *GameServer) HandleMoveChange(change backend.MoveChange) {
 	resp := proto.Response{
 		Action: &proto.Response_UpdateEntity{
 			UpdateEntity: &proto.UpdateEntity{
@@ -220,21 +225,35 @@ func (s *GameServer) HandleRemoveEntityChange(change backend.RemoveEntityChange)
 	s.Broadcast(&resp)
 }
 
+func (s *GameServer) HandlePlayerRespawnChange(change backend.PlayerRespawnChange) {
+	resp := proto.Response{
+		Action: &proto.Response_PlayerRespawn{
+			PlayerRespawn: &proto.PlayerRespawn{
+				Player: proto.GetProtoPlayer(change.Player),
+			},
+		},
+	}
+	s.Broadcast(&resp)
+}
+
 // WatchChanges waits for new game engine changes and broadcasts to clients.
 func (s *GameServer) WatchChanges() {
 	go func() {
 		for {
 			change := <-s.Game.ChangeChannel
 			switch change.(type) {
-			case backend.PositionChange:
-				change := change.(backend.PositionChange)
-				s.HandlePositionChange(change)
+			case backend.MoveChange:
+				change := change.(backend.MoveChange)
+				s.HandleMoveChange(change)
 			case backend.AddEntityChange:
 				change := change.(backend.AddEntityChange)
 				s.HandleAddEntityChange(change)
 			case backend.RemoveEntityChange:
 				change := change.(backend.RemoveEntityChange)
 				s.HandleRemoveEntityChange(change)
+			case backend.PlayerRespawnChange:
+				change := change.(backend.PlayerRespawnChange)
+				s.HandlePlayerRespawnChange(change)
 			}
 		}
 	}()

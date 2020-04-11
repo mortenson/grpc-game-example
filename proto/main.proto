@@ -70,6 +70,10 @@ message RemoveEntity {
     string id = 1;
 }
 
+message PlayerRespawn {
+    Player player = 1;
+}
+
 // Wraps multiple message actions.
 
 message Request {
@@ -86,5 +90,6 @@ message Response {
         AddEntity addEntity = 2;
         UpdateEntity updateEntity = 3;
         RemoveEntity removeEntity = 4;
+        PlayerRespawn playerRespawn = 5;
     }
 }

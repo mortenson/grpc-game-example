@@ -27,6 +27,7 @@ func randSeq(n int) string {
 
 func main() {
 	game := backend.NewGame()
+	game.IsAuthoritative = false
 	view := frontend.NewView(game)
 	game.Start()
 

@@ -99,6 +99,7 @@ func NewView(game *backend.Game) *View {
 		if laserDirection != backend.DirectionStop {
 			view.Game.ActionChannel <- backend.LaserAction{
 				OwnerID:   view.CurrentPlayer,
+				ID:        uuid.New(),
 				Direction: laserDirection,
 			}
 		}

@@ -11,20 +11,22 @@ import (
 // Game is the backend engine for the game. It can be used regardless of how
 // game data is rendered, or if a game server is being used.
 type Game struct {
-	Entities      map[uuid.UUID]Identifier
-	Mu            sync.RWMutex
-	ChangeChannel chan Change
-	ActionChannel chan Action
-	LastAction    map[string]time.Time
+	Entities        map[uuid.UUID]Identifier
+	Mu              sync.RWMutex
+	ChangeChannel   chan Change
+	ActionChannel   chan Action
+	LastAction      map[string]time.Time
+	IsAuthoritative bool
 }
 
 // NewGame constructs a new Game struct.
 func NewGame() *Game {
 	game := Game{
-		Entities:      make(map[uuid.UUID]Identifier),
-		ActionChannel: make(chan Action, 1),
-		LastAction:    make(map[string]time.Time),
-		ChangeChannel: make(chan Change, 1),
+		Entities:        make(map[uuid.UUID]Identifier),
+		ActionChannel:   make(chan Action, 1),
+		LastAction:      make(map[string]time.Time),
+		ChangeChannel:   make(chan Change, 1),
+		IsAuthoritative: true,
 	}
 	return &game
 }
@@ -40,50 +42,68 @@ func (game *Game) Start() {
 		}
 	}()
 	// Respond to laser collisions.
-	/*go func() {
+	if !game.IsAuthoritative {
+		return
+	}
+	go func() {
 		for {
-			game.Mux.Lock()
-			for id, laser := range game.Lasers {
-				laserPosition := laser.GetPosition()
-				didCollide := false
-				for _, player := range game.Players {
-					player.Mux.Lock()
-					if player.Position.X == laserPosition.X && player.Position.Y == laserPosition.Y {
-						didCollide = true
-						player.Position.X = 0
-						player.Position.Y = 0
-						change := PlayerKilledChange{
-							PlayerName:    player.Name,
-							SpawnPosition: player.Position,
-						}
-						player.Mux.Unlock()
-						select {
-						case game.ChangeChannel <- change:
-							// no-op.
-						default:
-							// no-op.
-						}
-					} else {
-						player.Mux.Unlock()
+			collisionMap := make(map[Coordinate][]Positioner)
+			game.Mu.RLock()
+			for _, entity := range game.Entities {
+				positioner, ok := entity.(Positioner)
+				if !ok {
+					continue
+				}
+				position := positioner.Position()
+				collisionMap[position] = append(collisionMap[position], positioner)
+			}
+			game.Mu.RUnlock()
+			for _, entities := range collisionMap {
+				if len(entities) <= 1 {
+					continue
+				}
+				hasLaser := false
+				for _, entity := range entities {
+					_, ok := entity.(*Laser)
+					if ok {
+						hasLaser = true
+						break
 					}
 				}
-				if didCollide {
-					delete(game.Lasers, id)
-					change := LaserRemoveChange{
-						UUID: id,
-					}
-					select {
-					case game.ChangeChannel <- change:
-						// no-op.
-					default:
-						// no-op.
+				if hasLaser {
+					for _, entity := range entities {
+						switch entity.(type) {
+						case *Laser:
+							laser := entity.(*Laser)
+							change := RemoveEntityChange{
+								Entity: laser,
+							}
+							select {
+							case game.ChangeChannel <- change:
+								// no-op.
+							default:
+								// no-op.
+							}
+							game.RemoveEntity(laser.ID())
+						case *Player:
+							player := entity.(*Player)
+							player.Move(Coordinate{X: 0, Y: 0})
+							change := PlayerRespawnChange{
+								Player: player,
+							}
+							select {
+							case game.ChangeChannel <- change:
+								// no-op.
+							default:
+								// no-op.
+							}
+						}
 					}
 				}
 			}
-			game.Mux.Unlock()
 			time.Sleep(time.Millisecond * 20)
 		}
-	}()*/
+	}()
 }
 
 func (game *Game) AddEntity(entity Identifier) {
@@ -168,8 +188,8 @@ func (e IdentifierBase) ID() uuid.UUID {
 // Change is sent by the game engine in response to Actions.
 type Change interface{}
 
-// PositionChange is sent when the game engine moves an entity.
-type PositionChange struct {
+// MoveChange is sent when the game engine moves an entity.
+type MoveChange struct {
 	Change
 	Entity    Identifier
 	Direction Direction
@@ -184,6 +204,11 @@ type AddEntityChange struct {
 type RemoveEntityChange struct {
 	Change
 	Entity Identifier
+}
+
+type PlayerRespawnChange struct {
+	Change
+	Player *Player
 }
 
 // Action is sent by the client when attempting to change game state. The
@@ -223,7 +248,7 @@ func (action MoveAction) Perform(game *Game) {
 	}
 	entity.(Mover).Move(position)
 	// Inform the client that the entity moved.
-	change := PositionChange{
+	change := MoveChange{
 		Entity:    entity,
 		Direction: action.Direction,
 		Position:  position,

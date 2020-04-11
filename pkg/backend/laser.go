@@ -35,6 +35,7 @@ func (laser *Laser) Position() Coordinate {
 
 type LaserAction struct {
 	Direction Direction
+	ID        uuid.UUID
 	OwnerID   uuid.UUID
 }
 
@@ -51,7 +52,7 @@ func (action LaserAction) Perform(game *Game) {
 		InitialPosition: entity.(Positioner).Position(),
 		StartTime:       time.Now(),
 		Direction:       action.Direction,
-		IdentifierBase:  IdentifierBase{uuid.New()},
+		IdentifierBase:  IdentifierBase{action.ID},
 	}
 	// Initialize the laser to the side of the player.
 	switch action.Direction {

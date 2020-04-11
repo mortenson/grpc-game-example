@@ -51,9 +51,9 @@ func (c *GameClient) Start() {
 		for {
 			change := <-c.Game.ChangeChannel
 			switch change.(type) {
-			case backend.PositionChange:
-				change := change.(backend.PositionChange)
-				c.HandlePositionChange(change)
+			case backend.MoveChange:
+				change := change.(backend.MoveChange)
+				c.HandleMoveChange(change)
 			case backend.AddEntityChange:
 				change := change.(backend.AddEntityChange)
 				c.HandleAddEntityChange(change)
@@ -81,13 +81,14 @@ func (c *GameClient) Start() {
 				c.HandleUpdateEntityResponse(resp)
 			case *proto.Response_RemoveEntity:
 				c.HandleRemoveEntityResponse(resp)
+			case *proto.Response_PlayerRespawn:
+				c.HandlePlayerRespawnResponse(resp)
 			}
 		}
 	}()
 }
 
-// HandlePositionChange sends position changes as moves to the server.
-func (c *GameClient) HandlePositionChange(change backend.PositionChange) {
+func (c *GameClient) HandleMoveChange(change backend.MoveChange) {
 	req := proto.Request{
 		Action: &proto.Request_Move{
 			Move: &proto.Move{
@@ -156,4 +157,14 @@ func (c *GameClient) HandleRemoveEntityResponse(resp *proto.Response) {
 		return
 	}
 	c.Game.RemoveEntity(id)
+}
+
+func (c *GameClient) HandlePlayerRespawnResponse(resp *proto.Response) {
+	respawn := resp.GetPlayerRespawn()
+	player := proto.GetBackendPlayer(respawn.Player)
+	if player == nil {
+		// @todo handle
+		return
+	}
+	c.Game.UpdateEntity(player)
 }
