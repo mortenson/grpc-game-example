@@ -2,6 +2,7 @@ package frontend
 
 import (
 	"fmt"
+	"math"
 	"sort"
 	"strings"
 	"time"
@@ -112,11 +113,38 @@ func setupScoreModal(view *View) {
 
 func setupViewPort(view *View) {
 	box := tview.NewBox().SetBorder(true).SetTitle("grpc-game-example")
+	cameraX := 0
+	cameraY := 0
 	box.SetDrawFunc(func(screen tcell.Screen, x int, y int, width int, height int) (int, int, int, int) {
+		// Move camera
+		view.Game.Mu.RLock()
+		currentEntity := view.Game.GetEntity(view.CurrentPlayer)
+		if currentEntity == nil {
+			return 0, 0, 0, 0
+		}
+		currentPlayer := currentEntity.(*backend.Player)
+		cameraDiffX := float64(cameraX - currentPlayer.Position().X)
+		cameraDiffY := float64(cameraY - currentPlayer.Position().Y)
+		if math.Abs(cameraDiffX) > 10 {
+			if cameraDiffX <= 0 {
+				cameraX++
+			} else {
+				cameraX--
+			}
+		}
+		if math.Abs(cameraDiffY) > 10 {
+			if cameraDiffY <= 0 {
+				cameraY++
+			} else {
+				cameraY--
+			}
+		}
+		view.Game.Mu.RUnlock()
+		// Draw game
 		width = width - 1
 		height = height - 1
-		centerY := y + height/2
-		centerX := x + width/2
+		centerY := (y + height/2) - cameraY
+		centerX := (x + width/2) - cameraX
 		for x := 1; x < width; x++ {
 			for y := 1; y < height; y++ {
 				screen.SetContent(x, y, ' ', nil, tcell.StyleDefault.Foreground(tcell.ColorWhite))
@@ -129,7 +157,6 @@ func setupViewPort(view *View) {
 			if !ok {
 				continue
 			}
-			position := positioner.Position()
 			var icon rune
 			var color tcell.Color
 			switch entity.(type) {
@@ -142,6 +169,8 @@ func setupViewPort(view *View) {
 			default:
 				continue
 			}
+			position := positioner.Position()
+			// See if player is far from center of viewport.
 			screen.SetContent(centerX+position.X, centerY+position.Y, icon, nil, tcell.StyleDefault.Foreground(color))
 		}
 		view.Game.Mu.RUnlock()
