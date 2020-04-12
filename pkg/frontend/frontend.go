@@ -112,10 +112,14 @@ func setupScoreModal(view *View) {
 }
 
 func setupViewPort(view *View) {
-	box := tview.NewBox().SetBorder(true).SetTitle("grpc-game-example")
+	box := tview.NewBox().
+		SetBorder(true).
+		SetTitle("grpc-game-example").
+		SetBackgroundColor(tcell.ColorBlack)
 	cameraX := 0
 	cameraY := 0
 	box.SetDrawFunc(func(screen tcell.Screen, x int, y int, width int, height int) (int, int, int, int) {
+		style := tcell.StyleDefault.Background(tcell.ColorBlack)
 		// Move camera
 		view.Game.Mu.RLock()
 		currentEntity := view.Game.GetEntity(view.CurrentPlayer)
@@ -145,12 +149,12 @@ func setupViewPort(view *View) {
 		height = height - 1
 		centerY := (y + height/2) - cameraY
 		centerX := (x + width/2) - cameraX
-		for x := 1; x < width; x++ {
-			for y := 1; y < height; y++ {
-				screen.SetContent(x, y, ' ', nil, tcell.StyleDefault.Foreground(tcell.ColorWhite))
-			}
-		}
-		screen.SetContent(centerX, centerY, 'O', nil, tcell.StyleDefault.Foreground(tcell.ColorWhite))
+		// for x := 1; x < width; x++ {
+		// 	for y := 1; y < height; y++ {
+		// 		screen.SetContent(x, y, ' ', nil, style.Foreground(tcell.ColorWhite))
+		// 	}
+		// }
+		screen.SetContent(centerX, centerY, 'O', nil, style.Foreground(tcell.ColorWhite))
 		view.Game.Mu.RLock()
 		for _, entity := range view.Game.Entities {
 			positioner, ok := entity.(backend.Positioner)
@@ -171,7 +175,7 @@ func setupViewPort(view *View) {
 			}
 			position := positioner.Position()
 			// See if player is far from center of viewport.
-			screen.SetContent(centerX+position.X, centerY+position.Y, icon, nil, tcell.StyleDefault.Foreground(color))
+			screen.SetContent(centerX+position.X, centerY+position.Y, icon, nil, style.Foreground(color))
 		}
 		view.Game.Mu.RUnlock()
 		return 0, 0, 0, 0
