@@ -24,9 +24,9 @@ type View struct {
 	Paused        bool
 }
 
-func centeredModal(p tview.Primitive, width, height int) tview.Primitive {
-	width = 0
-	height = 0
+func centeredModal(p tview.Primitive) tview.Primitive {
+	width := 0
+	height := 0
 	return tview.NewFlex().
 		AddItem(nil, 0, 1, false).
 		AddItem(tview.NewFlex().SetDirection(tview.FlexRow).
@@ -42,7 +42,7 @@ func setupRoundWaitModal(view *View) {
 		SetScrollable(true).
 		SetBorder(true).
 		SetTitle("Round complete")
-	modal := centeredModal(textView, 60, 5)
+	modal := centeredModal(textView)
 	view.Pages.AddPage("roundwait", modal, true, false)
 
 	callback := func() {
@@ -70,7 +70,7 @@ func setupRoundWaitModal(view *View) {
 func setupScoreModal(view *View) {
 	textView := tview.NewTextView()
 	textView.SetBorder(true).SetTitle("Score")
-	modal := centeredModal(textView, 60, 23)
+	modal := centeredModal(textView)
 
 	callback := func() {
 		view.Game.Mu.RLock()
