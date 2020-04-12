@@ -2,6 +2,8 @@ package frontend
 
 import (
 	"fmt"
+	"sort"
+	"strings"
 	"time"
 
 	"github.com/gdamore/tcell"
@@ -15,29 +17,66 @@ type View struct {
 	Game          *backend.Game
 	App           *tview.Application
 	Pages         *tview.Pages
-	RoundWait     *tview.TextView
+	DrawCallbacks []func()
+	ViewPort      tview.Primitive
 	CurrentPlayer uuid.UUID
 	Paused        bool
 }
 
-// NewView construsts a new View struct.
-func NewView(game *backend.Game) *View {
-	app := tview.NewApplication()
-	pages := tview.NewPages()
-	view := &View{
-		Game:   game,
-		App:    app,
-		Paused: false,
-		Pages:  pages,
+func centeredModal(p tview.Primitive, width, height int) tview.Primitive {
+	width = 0
+	height = 0
+	return tview.NewFlex().
+		AddItem(nil, 0, 1, false).
+		AddItem(tview.NewFlex().SetDirection(tview.FlexRow).
+			AddItem(nil, 0, 1, false).
+			AddItem(p, height, 1, false).
+			AddItem(nil, 0, 1, false), width, 1, false).
+		AddItem(nil, 0, 1, false)
+}
+
+func setupRoundWaitModal(view *View) {
+	textView := tview.NewTextView()
+	textView.SetTextAlign(tview.AlignCenter).
+		SetScrollable(true).
+		SetBorder(true).
+		SetTitle("Round complete")
+	modal := centeredModal(textView, 60, 5)
+	view.Pages.AddPage("roundwait", modal, true, false)
+
+	callback := func() {
+		if view.Game.WaitForRound {
+			view.Pages.ShowPage("roundwait")
+			seconds := int(view.Game.NewRoundAt.Sub(time.Now()).Seconds())
+			if seconds < 0 {
+				seconds = 0
+			}
+			player := view.Game.GetEntity(view.Game.RoundWinner).(*backend.Player)
+			text := fmt.Sprintf("\nWinner: %s\n\n", player.Name)
+			text += fmt.Sprintf("New round in %d seconds...", seconds)
+			textView.SetText(text)
+		} else {
+			view.Pages.HidePage("roundwait")
+			view.App.SetFocus(view.ViewPort)
+		}
 	}
-	roundWait := tview.NewTextView()
-	roundWait.SetTextAlign(tview.AlignCenter).SetBorder(true).SetTitle("round complete")
-	view.RoundWait = roundWait
-	score := tview.NewTextView()
-	score.SetBorder(true).SetTitle("score")
-	updateScore := func() {
+	view.DrawCallbacks = append(view.DrawCallbacks, callback)
+	view.Pages.AddPage("roundwait", modal, true, false)
+}
+
+func setupScoreModal(view *View) {
+	textView := tview.NewTextView()
+	textView.SetBorder(true).SetTitle("Score")
+	modal := centeredModal(textView, 60, 23)
+
+	callback := func() {
 		text := ""
-		game.Mu.RLock()
+		view.Game.Mu.RLock()
+		type PlayerScore struct {
+			Name  string
+			Score int
+		}
+		playerScore := make([]PlayerScore, 0)
 		for _, entity := range view.Game.Entities {
 			player, ok := entity.(*backend.Player)
 			if !ok {
@@ -47,11 +86,31 @@ func NewView(game *backend.Game) *View {
 			if !ok {
 				score = 0
 			}
-			text += fmt.Sprintf("%s - %d\n", player.Name, score)
+			playerScore = append(playerScore, PlayerScore{
+				Name:  player.Name,
+				Score: score,
+			})
 		}
-		game.Mu.RUnlock()
-		score.SetText(text)
+		sort.Slice(playerScore, func(i, j int) bool {
+			if playerScore[i].Score > playerScore[j].Score {
+				return true
+			}
+			if strings.ToLower(playerScore[i].Name) < strings.ToLower(playerScore[j].Name) {
+				return true
+			}
+			return false
+		})
+		for _, playerScore := range playerScore {
+			text += fmt.Sprintf("%s - %d\n", playerScore.Name, playerScore.Score)
+		}
+		view.Game.Mu.RUnlock()
+		textView.SetText(text)
 	}
+	view.DrawCallbacks = append(view.DrawCallbacks, callback)
+	view.Pages.AddPage("score", modal, true, false)
+}
+
+func setupViewPort(view *View) {
 	box := tview.NewBox().SetBorder(true).SetTitle("grpc-game-example")
 	box.SetDrawFunc(func(screen tcell.Screen, x int, y int, width int, height int) (int, int, int, int) {
 		width = width - 1
@@ -132,16 +191,31 @@ func NewView(game *backend.Game) *View {
 		}
 		return e
 	})
-	pages.AddPage("viewport", box, true, true)
-	pages.AddPage("score", score, true, false)
-	pages.AddPage("roundwait", roundWait, true, false)
+	view.Pages.AddPage("viewport", box, true, true)
+	view.ViewPort = box
+}
+
+// NewView construsts a new View struct.
+func NewView(game *backend.Game) *View {
+	app := tview.NewApplication()
+	pages := tview.NewPages()
+	view := &View{
+		Game:          game,
+		App:           app,
+		Paused:        false,
+		Pages:         pages,
+		DrawCallbacks: make([]func(), 0),
+	}
+	setupViewPort(view)
+	setupScoreModal(view)
+	setupRoundWaitModal(view)
 	app.SetInputCapture(func(e *tcell.EventKey) *tcell.EventKey {
 		if e.Rune() == 'p' {
-			updateScore()
 			pages.ShowPage("score")
 		}
 		if e.Key() == tcell.KeyESC {
 			pages.HidePage("score")
+			app.SetFocus(view.ViewPort)
 		}
 		return e
 	})
@@ -154,18 +228,8 @@ func (view *View) Start() error {
 	// Main loop - re-draw at ~60 FPS.
 	go func() {
 		for {
-			if view.Paused {
-				continue
-			}
-			if view.Game.WaitForRound {
-				view.Pages.ShowPage("roundwait")
-				seconds := int(view.Game.NewRoundAt.Sub(time.Now()).Seconds())
-				if seconds < 0 {
-					seconds = 0
-				}
-				view.RoundWait.SetText(fmt.Sprintf("New round in %d seconds...", seconds))
-			} else {
-				view.Pages.HidePage("roundwait")
+			for _, callback := range view.DrawCallbacks {
+				view.App.QueueUpdate(callback)
 			}
 			view.App.Draw()
 			time.Sleep(17 * time.Microsecond)

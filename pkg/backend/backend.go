@@ -18,6 +18,7 @@ type Game struct {
 	LastAction      map[string]time.Time
 	Score           map[uuid.UUID]int
 	NewRoundAt      time.Time
+	RoundWinner     uuid.UUID
 	WaitForRound    bool
 	IsAuthoritative bool
 }
@@ -153,6 +154,7 @@ func (game *Game) AddScore(id uuid.UUID) {
 		game.Score = make(map[uuid.UUID]int)
 		game.WaitForRound = true
 		game.NewRoundAt = time.Now().Add(time.Second * 10)
+		game.RoundWinner = id
 		// @todo add wait for round change
 		go func() {
 			time.Sleep(time.Second * 10)
