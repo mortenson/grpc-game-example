@@ -12,6 +12,7 @@ import (
 // game data is rendered, or if a game server is being used.
 type Game struct {
 	Entities        map[uuid.UUID]Identifier
+	Map             [][]int
 	Mu              sync.RWMutex
 	ChangeChannel   chan Change
 	ActionChannel   chan Action
@@ -33,6 +34,7 @@ func NewGame() *Game {
 		IsAuthoritative: true,
 		WaitForRound:    false,
 		Score:           make(map[uuid.UUID]int),
+		Map:             MapDefault,
 	}
 	return &game
 }
@@ -120,10 +122,49 @@ func (game *Game) Start() {
 					}
 				}
 			}
+			// Remove lasers that hit walls. Players _should_ never collide
+			// with walls (this is how you get out of bounds gltiches...)
+			for _, wall := range game.GetMapWalls() {
+				entities, ok := collisionMap[wall]
+				if !ok {
+					continue
+				}
+				for _, entity := range entities {
+					switch entity.(type) {
+					case *Laser:
+						change := RemoveEntityChange{
+							Entity: entity,
+						}
+						select {
+						case game.ChangeChannel <- change:
+						default:
+						}
+						game.RemoveEntity(entity.ID())
+					}
+				}
+			}
 			game.Mu.Unlock()
 			time.Sleep(time.Millisecond * 20)
 		}
 	}()
+}
+
+func (game *Game) GetMapWalls() []Coordinate {
+	mapCenterX := len(game.Map[0]) / 2
+	mapCenterY := len(game.Map) / 2
+	walls := make([]Coordinate, 0)
+	for mapY, row := range game.Map {
+		for mapX, col := range row {
+			if col != 1 {
+				continue
+			}
+			walls = append(walls, Coordinate{
+				X: mapX - mapCenterX,
+				Y: mapY - mapCenterY,
+			})
+		}
+	}
+	return walls
 }
 
 func (game *Game) AddEntity(entity Identifier) {
@@ -275,6 +316,12 @@ func (action MoveAction) Perform(game *Game) {
 		position.X--
 	case DirectionRight:
 		position.X++
+	}
+	// Check if position collides with a wall.
+	for _, wall := range game.GetMapWalls() {
+		if position == wall {
+			return
+		}
 	}
 	game.Move(entity.ID(), position)
 	// Inform the client that the entity moved.

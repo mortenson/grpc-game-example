@@ -146,16 +146,15 @@ func setupViewPort(view *View) {
 				cameraY--
 			}
 		}
-		// Draw game
 		width = width - 1
 		height = height - 1
 		centerY := (y + height/2) - cameraY
 		centerX := (x + width/2) - cameraX
-		// for x := 1; x < width; x++ {
-		// 	for y := 1; y < height; y++ {
-		// 		screen.SetContent(x, y, ' ', nil, style.Foreground(tcell.ColorWhite))
-		// 	}
-		// }
+		// Draw map
+		for _, wall := range view.Game.GetMapWalls() {
+			screen.SetContent(centerX+wall.X, centerY+wall.Y, '█', nil, style.Foreground(tcell.ColorWhite))
+		}
+		// Draw entities
 		if centerX < width && centerX > 0 && centerY < height && centerY > 0 {
 			screen.SetContent(centerX, centerY, 'C', nil, style.Foreground(tcell.ColorWhite))
 		}
