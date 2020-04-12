@@ -12,7 +12,7 @@ import (
 // game data is rendered, or if a game server is being used.
 type Game struct {
 	Entities        map[uuid.UUID]Identifier
-	Map             [][]int
+	Map             [][]rune
 	Mu              sync.RWMutex
 	ChangeChannel   chan Change
 	ActionChannel   chan Action
@@ -155,7 +155,7 @@ func (game *Game) GetMapWalls() []Coordinate {
 	walls := make([]Coordinate, 0)
 	for mapY, row := range game.Map {
 		for mapX, col := range row {
-			if col != 1 {
+			if col != '█' {
 				continue
 			}
 			walls = append(walls, Coordinate{
