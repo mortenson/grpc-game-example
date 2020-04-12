@@ -129,14 +129,14 @@ func setupViewPort(view *View) {
 		currentPlayer := currentEntity.(*backend.Player)
 		cameraDiffX := float64(cameraX - currentPlayer.Position().X)
 		cameraDiffY := float64(cameraY - currentPlayer.Position().Y)
-		if math.Abs(cameraDiffX) > 10 {
+		if math.Abs(cameraDiffX) > 8 {
 			if cameraDiffX <= 0 {
 				cameraX++
 			} else {
 				cameraX--
 			}
 		}
-		if math.Abs(cameraDiffY) > 10 {
+		if math.Abs(cameraDiffY) > 8 {
 			if cameraDiffY <= 0 {
 				cameraY++
 			} else {
@@ -154,11 +154,20 @@ func setupViewPort(view *View) {
 		// 		screen.SetContent(x, y, ' ', nil, style.Foreground(tcell.ColorWhite))
 		// 	}
 		// }
-		screen.SetContent(centerX, centerY, 'O', nil, style.Foreground(tcell.ColorWhite))
+		if centerX < width && centerX > 0 && centerY < height && centerY > 0 {
+			screen.SetContent(centerX, centerY, 'C', nil, style.Foreground(tcell.ColorWhite))
+		}
 		view.Game.Mu.RLock()
 		for _, entity := range view.Game.Entities {
 			positioner, ok := entity.(backend.Positioner)
 			if !ok {
+				continue
+			}
+			position := positioner.Position()
+			drawX := centerX + position.X
+			drawY := centerY + position.Y
+			// Don't draw things off screen.
+			if drawX >= width || drawX <= 0 || drawY >= height || drawY <= 0 {
 				continue
 			}
 			var icon rune
@@ -173,9 +182,8 @@ func setupViewPort(view *View) {
 			default:
 				continue
 			}
-			position := positioner.Position()
 			// See if player is far from center of viewport.
-			screen.SetContent(centerX+position.X, centerY+position.Y, icon, nil, style.Foreground(color))
+			screen.SetContent(drawX, drawY, icon, nil, style.Foreground(color))
 		}
 		view.Game.Mu.RUnlock()
 		return 0, 0, 0, 0
