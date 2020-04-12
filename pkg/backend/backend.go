@@ -2,6 +2,7 @@ package backend
 
 import (
 	"fmt"
+	"math"
 	"sync"
 	"time"
 
@@ -99,7 +100,16 @@ func (game *Game) Start() {
 					switch entity.(type) {
 					case *Player:
 						player := entity.(*Player)
-						game.Move(player.ID(), Coordinate{X: 0, Y: 0})
+						spawnPoints := game.GetMapSpawnPoints()
+						// Choose a spawn point furthest away from where the
+						// player died.
+						spawnPoint := spawnPoints[0]
+						for _, sp := range game.GetMapSpawnPoints() {
+							if Distance(player.Position(), sp) > Distance(player.Position(), spawnPoint) {
+								spawnPoint = sp
+							}
+						}
+						game.Move(player.ID(), spawnPoint)
 						change := PlayerRespawnChange{
 							Player: player,
 						}
@@ -149,22 +159,30 @@ func (game *Game) Start() {
 	}()
 }
 
-func (game *Game) GetMapWalls() []Coordinate {
+func (game *Game) GetMapSymbols() map[rune][]Coordinate {
 	mapCenterX := len(game.Map[0]) / 2
 	mapCenterY := len(game.Map) / 2
-	walls := make([]Coordinate, 0)
+	symbols := make(map[rune][]Coordinate, 0)
 	for mapY, row := range game.Map {
 		for mapX, col := range row {
-			if col != '█' {
+			if col == ' ' {
 				continue
 			}
-			walls = append(walls, Coordinate{
+			symbols[col] = append(symbols[col], Coordinate{
 				X: mapX - mapCenterX,
 				Y: mapY - mapCenterY,
 			})
 		}
 	}
-	return walls
+	return symbols
+}
+
+func (game *Game) GetMapWalls() []Coordinate {
+	return game.GetMapSymbols()['█']
+}
+
+func (game *Game) GetMapSpawnPoints() []Coordinate {
+	return game.GetMapSymbols()['S']
 }
 
 func (game *Game) AddEntity(entity Identifier) {
@@ -222,6 +240,10 @@ func (game *Game) UpdateLastActionTime(actionKey string) {
 type Coordinate struct {
 	X int
 	Y int
+}
+
+func Distance(a Coordinate, b Coordinate) int {
+	return int(math.Sqrt(math.Pow(float64(b.X-a.X), 2) + math.Pow(float64(b.Y-a.Y), 2)))
 }
 
 // Direction is used to represent Direction constants.
