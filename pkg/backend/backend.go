@@ -61,19 +61,24 @@ func (game *Game) Start() {
 	go func() {
 		for {
 			game.Mu.Lock()
-			collisionMap := make(map[Coordinate][]Positioner)
+			// Build a map of all entity positions.
+			collisionMap := make(map[Coordinate][]Identifier)
 			for _, entity := range game.Entities {
 				positioner, ok := entity.(Positioner)
 				if !ok {
 					continue
 				}
 				position := positioner.Position()
-				collisionMap[position] = append(collisionMap[position], positioner)
+				collisionMap[position] = append(collisionMap[position], entity)
 			}
+			// Check if any collide.
 			for _, entities := range collisionMap {
 				if len(entities) <= 1 {
 					continue
 				}
+				// Get the first laser, if present.
+				// @todo Make this generic is there are more "this kills you"
+				// entity types.
 				hasLaser := false
 				var laserOwnerID uuid.UUID
 				for _, entity := range entities {
@@ -84,37 +89,34 @@ func (game *Game) Start() {
 						break
 					}
 				}
-				if hasLaser {
-					for _, entity := range entities {
-						switch entity.(type) {
-						case *Laser:
-							laser := entity.(*Laser)
-							change := RemoveEntityChange{
-								Entity: laser,
-							}
-							select {
-							case game.ChangeChannel <- change:
-								// no-op.
-							default:
-								// no-op.
-							}
-							game.RemoveEntity(laser.ID())
-						case *Player:
-							player := entity.(*Player)
-							game.Move(player.ID(), Coordinate{X: 0, Y: 0})
-							change := PlayerRespawnChange{
-								Player: player,
-							}
-							select {
-							case game.ChangeChannel <- change:
-								// no-op.
-							default:
-								// no-op.
-							}
-							if player.ID() != laserOwnerID {
-								game.AddScore(laserOwnerID)
-							}
+				if !hasLaser {
+					continue
+				}
+				// Handle entities that collided with the laser.
+				for _, entity := range entities {
+					switch entity.(type) {
+					case *Player:
+						player := entity.(*Player)
+						game.Move(player.ID(), Coordinate{X: 0, Y: 0})
+						change := PlayerRespawnChange{
+							Player: player,
 						}
+						select {
+						case game.ChangeChannel <- change:
+						default:
+						}
+						if player.ID() != laserOwnerID {
+							game.AddScore(laserOwnerID)
+						}
+					default:
+						change := RemoveEntityChange{
+							Entity: entity,
+						}
+						select {
+						case game.ChangeChannel <- change:
+						default:
+						}
+						game.RemoveEntity(entity.ID())
 					}
 				}
 			}
@@ -283,9 +285,7 @@ func (action MoveAction) Perform(game *Game) {
 	}
 	select {
 	case game.ChangeChannel <- change:
-		// no-op.
 	default:
-		// no-op.
 	}
 	game.UpdateLastActionTime(actionKey)
 }
