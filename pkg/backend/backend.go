@@ -47,7 +47,9 @@ func (game *Game) Start() {
 			if game.WaitForRound {
 				continue
 			}
+			game.Mu.Lock()
 			action.Perform(game)
+			game.Mu.Unlock()
 		}
 	}()
 	// If the game isn't authoritative, some other system determines when
@@ -58,8 +60,8 @@ func (game *Game) Start() {
 	// Check for player death.
 	go func() {
 		for {
+			game.Mu.Lock()
 			collisionMap := make(map[Coordinate][]Positioner)
-			game.Mu.RLock()
 			for _, entity := range game.Entities {
 				positioner, ok := entity.(Positioner)
 				if !ok {
@@ -68,7 +70,6 @@ func (game *Game) Start() {
 				position := positioner.Position()
 				collisionMap[position] = append(collisionMap[position], positioner)
 			}
-			game.Mu.RUnlock()
 			for _, entities := range collisionMap {
 				if len(entities) <= 1 {
 					continue
@@ -117,38 +118,30 @@ func (game *Game) Start() {
 					}
 				}
 			}
+			game.Mu.Unlock()
 			time.Sleep(time.Millisecond * 20)
 		}
 	}()
 }
 
 func (game *Game) AddEntity(entity Identifier) {
-	game.Mu.Lock()
 	game.Entities[entity.ID()] = entity
-	game.Mu.Unlock()
 }
 
 func (game *Game) UpdateEntity(entity Identifier) {
 	// @todo is replacing the struct bad?
-	game.Mu.Lock()
 	game.Entities[entity.ID()] = entity
-	game.Mu.Unlock()
 }
 
 func (game *Game) GetEntity(id uuid.UUID) Identifier {
-	game.Mu.RLock()
-	defer game.Mu.RUnlock()
 	return game.Entities[id]
 }
 
 func (game *Game) RemoveEntity(id uuid.UUID) {
-	game.Mu.Lock()
 	delete(game.Entities, id)
-	game.Mu.Unlock()
 }
 
 func (game *Game) AddScore(id uuid.UUID) {
-	game.Mu.Lock()
 	game.Score[id]++
 	if game.Score[id] >= 10 {
 		game.Score = make(map[uuid.UUID]int)
@@ -158,23 +151,20 @@ func (game *Game) AddScore(id uuid.UUID) {
 		// @todo add wait for round change
 		go func() {
 			time.Sleep(time.Second * 10)
+			game.Mu.Lock()
 			game.WaitForRound = false
+			game.Mu.Unlock()
 			// @todo add start round change
 		}()
 	}
-	game.Mu.Unlock()
 }
 
 func (game *Game) Move(id uuid.UUID, position Coordinate) {
-	game.Mu.Lock()
 	game.Entities[id].(Mover).Move(position)
-	game.Mu.Unlock()
 }
 
 func (game *Game) CheckLastActionTime(actionKey string, throttle int) bool {
-	game.Mu.RLock()
 	lastAction, ok := game.LastAction[actionKey]
-	game.Mu.RUnlock()
 	if ok && lastAction.After(time.Now().Add(-1*time.Duration(throttle)*time.Millisecond)) {
 		return false
 	}
@@ -182,9 +172,7 @@ func (game *Game) CheckLastActionTime(actionKey string, throttle int) bool {
 }
 
 func (game *Game) UpdateLastActionTime(actionKey string) {
-	game.Mu.Lock()
 	game.LastAction[actionKey] = time.Now()
-	game.Mu.Unlock()
 }
 
 // Coordinate is used for all position-related variables.

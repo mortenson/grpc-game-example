@@ -46,6 +46,8 @@ func setupRoundWaitModal(view *View) {
 	view.Pages.AddPage("roundwait", modal, true, false)
 
 	callback := func() {
+		view.Game.Mu.RLock()
+		defer view.Game.Mu.RUnlock()
 		if view.Game.WaitForRound {
 			view.Pages.ShowPage("roundwait")
 			seconds := int(view.Game.NewRoundAt.Sub(time.Now()).Seconds())
@@ -71,8 +73,9 @@ func setupScoreModal(view *View) {
 	modal := centeredModal(textView, 60, 23)
 
 	callback := func() {
-		text := ""
 		view.Game.Mu.RLock()
+		defer view.Game.Mu.RUnlock()
+		text := ""
 		type PlayerScore struct {
 			Name  string
 			Score int
@@ -104,7 +107,6 @@ func setupScoreModal(view *View) {
 		for _, playerScore := range playerScore {
 			text += fmt.Sprintf("%s - %d\n", playerScore.Name, playerScore.Score)
 		}
-		view.Game.Mu.RUnlock()
 		textView.SetText(text)
 	}
 	view.DrawCallbacks = append(view.DrawCallbacks, callback)
@@ -119,16 +121,17 @@ func setupViewPort(view *View) {
 	cameraX := 0
 	cameraY := 0
 	box.SetDrawFunc(func(screen tcell.Screen, x int, y int, width int, height int) (int, int, int, int) {
+		view.Game.Mu.RLock()
+		defer view.Game.Mu.RUnlock()
 		style := tcell.StyleDefault.Background(tcell.ColorBlack)
 		// Move camera
-		view.Game.Mu.RLock()
 		currentEntity := view.Game.GetEntity(view.CurrentPlayer)
 		if currentEntity == nil {
 			return 0, 0, 0, 0
 		}
-		currentPlayer := currentEntity.(*backend.Player)
-		cameraDiffX := float64(cameraX - currentPlayer.Position().X)
-		cameraDiffY := float64(cameraY - currentPlayer.Position().Y)
+		currentPlayerPosition := currentEntity.(*backend.Player).Position()
+		cameraDiffX := float64(cameraX - currentPlayerPosition.X)
+		cameraDiffY := float64(cameraY - currentPlayerPosition.Y)
 		if math.Abs(cameraDiffX) > 8 {
 			if cameraDiffX <= 0 {
 				cameraX++
@@ -143,7 +146,6 @@ func setupViewPort(view *View) {
 				cameraY--
 			}
 		}
-		view.Game.Mu.RUnlock()
 		// Draw game
 		width = width - 1
 		height = height - 1
@@ -157,7 +159,6 @@ func setupViewPort(view *View) {
 		if centerX < width && centerX > 0 && centerY < height && centerY > 0 {
 			screen.SetContent(centerX, centerY, 'C', nil, style.Foreground(tcell.ColorWhite))
 		}
-		view.Game.Mu.RLock()
 		for _, entity := range view.Game.Entities {
 			positioner, ok := entity.(backend.Positioner)
 			if !ok {
@@ -185,7 +186,6 @@ func setupViewPort(view *View) {
 			// See if player is far from center of viewport.
 			screen.SetContent(drawX, drawY, icon, nil, style.Foreground(color))
 		}
-		view.Game.Mu.RUnlock()
 		return 0, 0, 0, 0
 	})
 	// Handle player movement input.
