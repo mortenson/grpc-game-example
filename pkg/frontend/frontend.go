@@ -114,6 +114,10 @@ func setupScoreModal(view *View) {
 	view.pages.AddPage("score", modal, true, false)
 }
 
+func withinDrawBounds(x, y, width, height int) bool {
+	return x < width && x > 0 && y < height && y > 0
+}
+
 func setupViewPort(view *View) {
 	box := tview.NewBox().
 		SetBorder(true).
@@ -153,12 +157,18 @@ func setupViewPort(view *View) {
 		centerX := (x + width/2) - cameraX
 		// Draw map
 		for _, wall := range view.Game.GetMapWalls() {
-			screen.SetContent(centerX+wall.X, centerY+wall.Y, '█', nil, style.Foreground(tcell.ColorWhite))
+			x := centerX + wall.X
+			y := centerY + wall.Y
+			if !withinDrawBounds(x, y, width, height) {
+				continue
+			}
+			screen.SetContent(x, y, '█', nil, style.Foreground(tcell.ColorWhite))
 		}
+		// Draw center point - useful for debugging
+		// if withinDrawBounds(centerX, centerY, width, height) {
+		// 	screen.SetContent(centerX, centerY, 'C', nil, style.Foreground(tcell.ColorWhite))
+		// }
 		// Draw entities
-		if centerX < width && centerX > 0 && centerY < height && centerY > 0 {
-			screen.SetContent(centerX, centerY, 'C', nil, style.Foreground(tcell.ColorWhite))
-		}
 		for _, entity := range view.Game.Entities {
 			positioner, ok := entity.(backend.Positioner)
 			if !ok {
@@ -167,8 +177,7 @@ func setupViewPort(view *View) {
 			position := positioner.Position()
 			drawX := centerX + position.X
 			drawY := centerY + position.Y
-			// Don't draw things off screen.
-			if drawX >= width || drawX <= 0 || drawY >= height || drawY <= 0 {
+			if !withinDrawBounds(drawX, drawY, width, height) {
 				continue
 			}
 			var icon rune
