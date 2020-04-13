@@ -73,6 +73,16 @@ message RemoveEntity {
 
 message PlayerRespawn {
     Player player = 1;
+    string killedById = 2;
+}
+
+message RoundOver {
+    string roundWinnerId = 1;
+    google.protobuf.Timestamp newRoundAt = 2;
+}
+
+message RoundStart {
+    repeated Player players = 1;
 }
 
 // Wraps multiple message actions.
@@ -92,5 +102,7 @@ message Response {
         UpdateEntity updateEntity = 3;
         RemoveEntity removeEntity = 4;
         PlayerRespawn playerRespawn = 5;
+        RoundOver roundOver = 6;
+        RoundStart roundStart = 7;
     }
 }

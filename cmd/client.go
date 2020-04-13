@@ -31,8 +31,6 @@ func main() {
 	view := frontend.NewView(game)
 	game.Start()
 
-	playerName := randSeq(6)
-
 	conn, err := grpc.Dial(":8888", grpc.WithInsecure())
 	if err != nil {
 		log.Fatalf("can not connect with server %v", err)
@@ -57,9 +55,11 @@ func main() {
 		log.Fatalf("openn stream error %v", err)
 	}
 
-	playerID := uuid.New()
 	client := client.NewGameClient(stream, game, view)
 	client.Start()
+
+	playerID := uuid.New()
+	playerName := randSeq(6)
 	client.Connect(playerID, playerName)
 
 	view.Start()

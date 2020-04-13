@@ -4,6 +4,7 @@ import (
 	"io"
 	"log"
 
+	"github.com/golang/protobuf/ptypes"
 	"github.com/google/uuid"
 	"github.com/mortenson/grpc-game-example/pkg/backend"
 	"github.com/mortenson/grpc-game-example/pkg/frontend"
@@ -83,6 +84,10 @@ func (c *GameClient) Start() {
 				c.HandleRemoveEntityResponse(resp)
 			case *proto.Response_PlayerRespawn:
 				c.HandlePlayerRespawnResponse(resp)
+			case *proto.Response_RoundOver:
+				c.HandleRoundOverResponse(resp)
+			case *proto.Response_RoundStart:
+				c.HandleRoundStartResponse(resp)
 			}
 		}
 	}()
@@ -106,7 +111,7 @@ func (c *GameClient) HandleAddEntityChange(change backend.AddEntityChange) {
 		laser := change.Entity.(*backend.Laser)
 		req := proto.Request{
 			Action: &proto.Request_Laser{
-				Laser: proto.GetProtoEntity(laser).GetLaser(),
+				Laser: proto.GetProtoLaser(laser),
 			},
 		}
 		c.Stream.Send(&req)
@@ -116,6 +121,8 @@ func (c *GameClient) HandleAddEntityChange(change backend.AddEntityChange) {
 // HandleInitializeResponse initializes the local player with information
 // provided by the server.
 func (c *GameClient) HandleInitializeResponse(resp *proto.Response) {
+	c.Game.Mu.Lock()
+	defer c.Game.Mu.Unlock()
 	init := resp.GetInitialize()
 	for _, entity := range init.Entities {
 		backendEntity := proto.GetBackendEntity(entity)
@@ -130,6 +137,8 @@ func (c *GameClient) HandleInitializeResponse(resp *proto.Response) {
 }
 
 func (c *GameClient) HandleAddEntityResponse(resp *proto.Response) {
+	c.Game.Mu.Lock()
+	defer c.Game.Mu.Unlock()
 	add := resp.GetAddEntity()
 	entity := proto.GetBackendEntity(add.Entity)
 	if entity == nil {
@@ -140,6 +149,8 @@ func (c *GameClient) HandleAddEntityResponse(resp *proto.Response) {
 }
 
 func (c *GameClient) HandleUpdateEntityResponse(resp *proto.Response) {
+	c.Game.Mu.Lock()
+	defer c.Game.Mu.Unlock()
 	update := resp.GetUpdateEntity()
 	entity := proto.GetBackendEntity(update.Entity)
 	if entity == nil {
@@ -150,6 +161,8 @@ func (c *GameClient) HandleUpdateEntityResponse(resp *proto.Response) {
 }
 
 func (c *GameClient) HandleRemoveEntityResponse(resp *proto.Response) {
+	c.Game.Mu.Lock()
+	defer c.Game.Mu.Unlock()
 	remove := resp.GetRemoveEntity()
 	id, err := uuid.Parse(remove.Id)
 	if err != nil {
@@ -160,11 +173,50 @@ func (c *GameClient) HandleRemoveEntityResponse(resp *proto.Response) {
 }
 
 func (c *GameClient) HandlePlayerRespawnResponse(resp *proto.Response) {
+	c.Game.Mu.Lock()
+	defer c.Game.Mu.Unlock()
 	respawn := resp.GetPlayerRespawn()
+	killedByID, err := uuid.Parse(respawn.KilledById)
+	if err != nil {
+		// @todo handle
+		return
+	}
 	player := proto.GetBackendPlayer(respawn.Player)
 	if player == nil {
 		// @todo handle
 		return
 	}
+	c.Game.AddScore(killedByID)
 	c.Game.UpdateEntity(player)
+}
+
+func (c *GameClient) HandleRoundOverResponse(resp *proto.Response) {
+	c.Game.Mu.Lock()
+	defer c.Game.Mu.Unlock()
+	respawn := resp.GetRoundOver()
+	roundWinner, err := uuid.Parse(respawn.RoundWinnerId)
+	if err != nil {
+		// @todo error
+		return
+	}
+	newRoundAt, err := ptypes.Timestamp(respawn.NewRoundAt)
+	if err != nil {
+		// @todo error
+		return
+	}
+	c.Game.RoundWinner = roundWinner
+	c.Game.NewRoundAt = newRoundAt
+	c.Game.WaitForRound = true
+	c.Game.Score = make(map[uuid.UUID]int)
+}
+
+func (c *GameClient) HandleRoundStartResponse(resp *proto.Response) {
+	c.Game.Mu.Lock()
+	defer c.Game.Mu.Unlock()
+	roundStart := resp.GetRoundStart()
+	c.Game.WaitForRound = false
+	for _, protoPlayer := range roundStart.Players {
+		player := proto.GetBackendPlayer(protoPlayer)
+		c.Game.AddEntity(player)
+	}
 }

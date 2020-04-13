@@ -5,6 +5,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/golang/protobuf/ptypes"
 	"github.com/google/uuid"
 
 	"github.com/mortenson/grpc-game-example/pkg/backend"
@@ -34,17 +35,20 @@ func NewGameServer(game *backend.Game) *GameServer {
 // Broadcast sends a response to all clients.
 func (s *GameServer) Broadcast(resp *proto.Response) {
 	s.Mux.RLock()
+	defer s.Mux.RUnlock()
 	for name, client := range s.Clients {
 		if err := client.StreamServer.Send(resp); err != nil {
 			log.Printf("broadcast error %v", err)
 		}
 		log.Printf("broadcasted %+v message to %s", resp, name)
 	}
-	s.Mux.RUnlock()
 }
 
 // HandleConnectRequest processes new players.
 func (s *GameServer) HandleConnectRequest(req *proto.Request, srv proto.Game_StreamServer) uuid.UUID {
+	s.Game.Mu.Lock()
+	defer s.Game.Mu.Unlock()
+
 	connect := req.GetConnect()
 
 	// @todo Choose a start position away from other players?
@@ -134,9 +138,13 @@ func (s *GameServer) HandleLaserRequest(playerID uuid.UUID, req *proto.Request, 
 // RemoveClient removes a client from the game, usually in response to a logout
 // or series error.
 func (s *GameServer) RemoveClient(playerID uuid.UUID, srv proto.Game_StreamServer) {
+	s.Game.Mu.Lock()
+	defer s.Game.Mu.Unlock()
+
 	s.Mux.Lock()
 	delete(s.Clients, playerID)
 	s.Mux.Unlock()
+
 	s.Game.RemoveEntity(playerID)
 
 	resp := proto.Response{
@@ -227,7 +235,47 @@ func (s *GameServer) HandlePlayerRespawnChange(change backend.PlayerRespawnChang
 	resp := proto.Response{
 		Action: &proto.Response_PlayerRespawn{
 			PlayerRespawn: &proto.PlayerRespawn{
-				Player: proto.GetProtoPlayer(change.Player),
+				Player:     proto.GetProtoPlayer(change.Player),
+				KilledById: change.KilledByID.String(),
+			},
+		},
+	}
+	s.Broadcast(&resp)
+}
+
+func (s *GameServer) HandleRoundOverChange(change backend.RoundOverChange) {
+	s.Game.Mu.RLock()
+	defer s.Game.Mu.RUnlock()
+	timestamp, err := ptypes.TimestampProto(s.Game.NewRoundAt)
+	if err != nil {
+		return
+	}
+	resp := proto.Response{
+		Action: &proto.Response_RoundOver{
+			RoundOver: &proto.RoundOver{
+				RoundWinnerId: s.Game.RoundWinner.String(),
+				NewRoundAt:    timestamp,
+			},
+		},
+	}
+	s.Broadcast(&resp)
+}
+
+func (s *GameServer) HandleRoundStartChange(change backend.RoundStartChange) {
+	players := []*proto.Player{}
+	s.Game.Mu.RLock()
+	for _, entity := range s.Game.Entities {
+		player, ok := entity.(*backend.Player)
+		if !ok {
+			continue
+		}
+		players = append(players, proto.GetProtoPlayer(player))
+	}
+	s.Game.Mu.RUnlock()
+	resp := proto.Response{
+		Action: &proto.Response_RoundStart{
+			RoundStart: &proto.RoundStart{
+				Players: players,
 			},
 		},
 	}
@@ -252,6 +300,12 @@ func (s *GameServer) WatchChanges() {
 			case backend.PlayerRespawnChange:
 				change := change.(backend.PlayerRespawnChange)
 				s.HandlePlayerRespawnChange(change)
+			case backend.RoundOverChange:
+				change := change.(backend.RoundOverChange)
+				s.HandleRoundOverChange(change)
+			case backend.RoundStartChange:
+				change := change.(backend.RoundStartChange)
+				s.HandleRoundStartChange(change)
 			}
 		}
 	}()

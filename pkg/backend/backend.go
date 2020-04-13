@@ -100,6 +100,10 @@ func (game *Game) Start() {
 					switch entity.(type) {
 					case *Player:
 						player := entity.(*Player)
+						// Don't allow players to kill themselves.
+						if player.ID() == laserOwnerID {
+							continue
+						}
 						spawnPoints := game.GetMapSpawnPoints()
 						// Choose a spawn point furthest away from where the
 						// player died.
@@ -109,25 +113,20 @@ func (game *Game) Start() {
 								spawnPoint = sp
 							}
 						}
+						// For debugging.
+						spawnPoint = Coordinate{X: 0, Y: 0}
 						game.Move(player.ID(), spawnPoint)
 						change := PlayerRespawnChange{
-							Player: player,
+							Player:     player,
+							KilledByID: laserOwnerID,
 						}
-						select {
-						case game.ChangeChannel <- change:
-						default:
-						}
-						if player.ID() != laserOwnerID {
-							game.AddScore(laserOwnerID)
-						}
+						game.SendChange(change)
+						game.AddScore(laserOwnerID)
 					default:
 						change := RemoveEntityChange{
 							Entity: entity,
 						}
-						select {
-						case game.ChangeChannel <- change:
-						default:
-						}
+						game.SendChange(change)
 						game.RemoveEntity(entity.ID())
 					}
 				}
@@ -145,10 +144,7 @@ func (game *Game) Start() {
 						change := RemoveEntityChange{
 							Entity: entity,
 						}
-						select {
-						case game.ChangeChannel <- change:
-						default:
-						}
+						game.SendChange(change)
 						game.RemoveEntity(entity.ID())
 					}
 				}
@@ -209,13 +205,24 @@ func (game *Game) AddScore(id uuid.UUID) {
 		game.WaitForRound = true
 		game.NewRoundAt = time.Now().Add(time.Second * 10)
 		game.RoundWinner = id
-		// @todo add wait for round change
+		game.SendChange(RoundOverChange{})
 		go func() {
 			time.Sleep(time.Second * 10)
 			game.Mu.Lock()
 			game.WaitForRound = false
+			// Respawn players.
+			i := 0
+			spawnPoints := game.GetMapSpawnPoints()
+			for _, entity := range game.Entities {
+				player, ok := entity.(*Player)
+				if !ok {
+					continue
+				}
+				player.CurrentPosition = spawnPoints[i%len(spawnPoints)]
+				i++
+			}
 			game.Mu.Unlock()
-			// @todo add start round change
+			game.SendChange(RoundStartChange{})
 		}()
 	}
 }
@@ -234,6 +241,13 @@ func (game *Game) CheckLastActionTime(actionKey string, throttle int) bool {
 
 func (game *Game) UpdateLastActionTime(actionKey string) {
 	game.LastAction[actionKey] = time.Now()
+}
+
+func (game *Game) SendChange(change Change) {
+	select {
+	case game.ChangeChannel <- change:
+	default:
+	}
 }
 
 // Coordinate is used for all position-related variables.
@@ -289,6 +303,14 @@ type MoveChange struct {
 	Position  Coordinate
 }
 
+type RoundOverChange struct {
+	Change
+}
+
+type RoundStartChange struct {
+	Change
+}
+
 type AddEntityChange struct {
 	Change
 	Entity Identifier
@@ -301,7 +323,8 @@ type RemoveEntityChange struct {
 
 type PlayerRespawnChange struct {
 	Change
-	Player *Player
+	Player     *Player
+	KilledByID uuid.UUID
 }
 
 // Action is sent by the client when attempting to change game state. The
@@ -352,9 +375,6 @@ func (action MoveAction) Perform(game *Game) {
 		Direction: action.Direction,
 		Position:  position,
 	}
-	select {
-	case game.ChangeChannel <- change:
-	default:
-	}
+	game.SendChange(change)
 	game.UpdateLastActionTime(actionKey)
 }
