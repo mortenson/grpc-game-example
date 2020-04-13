@@ -1,5 +1,31 @@
 package backend
 
+func (game *Game) GetMapSymbols() map[rune][]Coordinate {
+	mapCenterX := len(game.Map[0]) / 2
+	mapCenterY := len(game.Map) / 2
+	symbols := make(map[rune][]Coordinate, 0)
+	for mapY, row := range game.Map {
+		for mapX, col := range row {
+			if col == ' ' {
+				continue
+			}
+			symbols[col] = append(symbols[col], Coordinate{
+				X: mapX - mapCenterX,
+				Y: mapY - mapCenterY,
+			})
+		}
+	}
+	return symbols
+}
+
+func (game *Game) GetMapWalls() []Coordinate {
+	return game.GetMapSymbols()['█']
+}
+
+func (game *Game) GetMapSpawnPoints() []Coordinate {
+	return game.GetMapSymbols()['S']
+}
+
 var MapDefault = [][]rune{
 	{'█', '█', '█', '█', '█', '█', '█', '█', '█', '█', '█', '█', '█', '█', '█', '█', '█', '█', '█', '█', '█', '█', '█', '█', '█', '█', '█', '█', '█', '█', '█', '█', '█', '█', '█', '█', '█', '█', '█', '█'},
 	{'█', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', '█'},

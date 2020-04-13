@@ -43,142 +43,120 @@ func NewGame() *Game {
 // Start begins the main game loop, which waits for new actions and updates the
 // game state occordinly.
 func (game *Game) Start() {
-	// Read actions from the channel.
-	go func() {
-		for {
-			action := <-game.ActionChannel
-			if game.WaitForRound {
+	go game.watchActions()
+	go game.watchCollisions()
+}
+
+func (game *Game) watchActions() {
+	for {
+		action := <-game.ActionChannel
+		if game.WaitForRound {
+			continue
+		}
+		game.Mu.Lock()
+		action.Perform(game)
+		game.Mu.Unlock()
+	}
+}
+
+func (game *Game) getCollisionMap() map[Coordinate][]Identifier {
+	collisionMap := map[Coordinate][]Identifier{}
+	for _, entity := range game.Entities {
+		positioner, ok := entity.(Positioner)
+		if !ok {
+			continue
+		}
+		position := positioner.Position()
+		collisionMap[position] = append(collisionMap[position], entity)
+	}
+	return collisionMap
+}
+
+func (game *Game) watchCollisions() {
+	for {
+		game.Mu.Lock()
+		for _, entities := range game.getCollisionMap() {
+			if len(entities) <= 1 {
 				continue
 			}
-			game.Mu.Lock()
-			action.Perform(game)
-			game.Mu.Unlock()
-		}
-	}()
-	// If the game isn't authoritative, some other system determines when
-	// players are hit.
-	if !game.IsAuthoritative {
-		return
-	}
-	// Check for player death.
-	go func() {
-		for {
-			game.Mu.Lock()
-			// Build a map of all entity positions.
-			collisionMap := make(map[Coordinate][]Identifier)
-			for _, entity := range game.Entities {
-				positioner, ok := entity.(Positioner)
-				if !ok {
-					continue
-				}
-				position := positioner.Position()
-				collisionMap[position] = append(collisionMap[position], entity)
-			}
-			// Check if any collide.
-			for _, entities := range collisionMap {
-				if len(entities) <= 1 {
-					continue
-				}
-				// Get the first laser, if present.
-				// @todo Make this generic is there are more "this kills you"
-				// entity types.
-				hasLaser := false
-				var laserOwnerID uuid.UUID
-				for _, entity := range entities {
-					laser, ok := entity.(*Laser)
-					if ok {
-						hasLaser = true
-						laserOwnerID = laser.OwnerID
-						break
-					}
-				}
-				if !hasLaser {
-					continue
-				}
-				// Handle entities that collided with the laser.
-				for _, entity := range entities {
-					switch entity.(type) {
-					case *Player:
-						player := entity.(*Player)
-						// Don't allow players to kill themselves.
-						if player.ID() == laserOwnerID {
-							continue
-						}
-						spawnPoints := game.GetMapSpawnPoints()
-						// Choose a spawn point furthest away from where the
-						// player died.
-						spawnPoint := spawnPoints[0]
-						for _, sp := range game.GetMapSpawnPoints() {
-							if Distance(player.Position(), sp) > Distance(player.Position(), spawnPoint) {
-								spawnPoint = sp
-							}
-						}
-						// For debugging.
-						spawnPoint = Coordinate{X: 0, Y: 0}
-						game.Move(player.ID(), spawnPoint)
-						change := PlayerRespawnChange{
-							Player:     player,
-							KilledByID: laserOwnerID,
-						}
-						game.SendChange(change)
-						game.AddScore(laserOwnerID)
-					default:
-						change := RemoveEntityChange{
-							Entity: entity,
-						}
-						game.SendChange(change)
-						game.RemoveEntity(entity.ID())
-					}
+			// Get the first laser, if present.
+			// @todo Make this generic is there are more "this kills you"
+			// entity types.
+			hasLaser := false
+			var laserOwnerID uuid.UUID
+			for _, entity := range entities {
+				laser, ok := entity.(*Laser)
+				if ok {
+					hasLaser = true
+					laserOwnerID = laser.OwnerID
+					break
 				}
 			}
-			// Remove lasers that hit walls. Players _should_ never collide
-			// with walls (this is how you get out of bounds gltiches...)
-			for _, wall := range game.GetMapWalls() {
-				entities, ok := collisionMap[wall]
-				if !ok {
-					continue
-				}
-				for _, entity := range entities {
-					switch entity.(type) {
-					case *Laser:
-						change := RemoveEntityChange{
-							Entity: entity,
-						}
-						game.SendChange(change)
-						game.RemoveEntity(entity.ID())
-					}
-				}
-			}
-			game.Mu.Unlock()
-			time.Sleep(time.Millisecond * 20)
-		}
-	}()
-}
-
-func (game *Game) GetMapSymbols() map[rune][]Coordinate {
-	mapCenterX := len(game.Map[0]) / 2
-	mapCenterY := len(game.Map) / 2
-	symbols := make(map[rune][]Coordinate, 0)
-	for mapY, row := range game.Map {
-		for mapX, col := range row {
-			if col == ' ' {
+			if !hasLaser {
 				continue
 			}
-			symbols[col] = append(symbols[col], Coordinate{
-				X: mapX - mapCenterX,
-				Y: mapY - mapCenterY,
-			})
+			// Handle entities that collided with the laser.
+			for _, entity := range entities {
+				switch entity.(type) {
+				case *Player:
+					// If the game isn't authoritative, another system decides
+					// when players die and score is changed.
+					if !game.IsAuthoritative {
+						continue
+					}
+					player := entity.(*Player)
+					// Don't allow players to kill themselves.
+					if player.ID() == laserOwnerID {
+						continue
+					}
+					spawnPoints := game.GetMapSpawnPoints()
+					// Choose a spawn point furthest away from where the
+					// player died.
+					spawnPoint := spawnPoints[0]
+					for _, sp := range game.GetMapSpawnPoints() {
+						if Distance(player.Position(), sp) > Distance(player.Position(), spawnPoint) {
+							spawnPoint = sp
+						}
+					}
+					// For debugging.
+					// spawnPoint = Coordinate{X: 0, Y: 0}
+					player.Move(spawnPoint)
+					change := PlayerRespawnChange{
+						Player:     player,
+						KilledByID: laserOwnerID,
+					}
+					game.SendChange(change)
+					game.AddScore(laserOwnerID)
+				case *Laser:
+					change := RemoveEntityChange{
+						Entity: entity,
+					}
+					game.SendChange(change)
+					game.RemoveEntity(entity.ID())
+				}
+			}
 		}
+		// Remove lasers that hit walls.
+		collisionMap := game.getCollisionMap()
+		for _, wall := range game.GetMapWalls() {
+			entities, ok := collisionMap[wall]
+			if !ok {
+				continue
+			}
+			for _, entity := range entities {
+				switch entity.(type) {
+				case *Laser:
+					change := RemoveEntityChange{
+						Entity: entity,
+					}
+					game.SendChange(change)
+					game.RemoveEntity(entity.ID())
+				}
+			}
+		}
+		game.Mu.Unlock()
+		time.Sleep(time.Millisecond * 20)
 	}
-	return symbols
-}
-
-func (game *Game) GetMapWalls() []Coordinate {
-	return game.GetMapSymbols()['█']
-}
-
-func (game *Game) GetMapSpawnPoints() []Coordinate {
-	return game.GetMapSymbols()['S']
 }
 
 func (game *Game) AddEntity(entity Identifier) {
@@ -186,7 +164,6 @@ func (game *Game) AddEntity(entity Identifier) {
 }
 
 func (game *Game) UpdateEntity(entity Identifier) {
-	// @todo is replacing the struct bad?
 	game.Entities[entity.ID()] = entity
 }
 
@@ -198,37 +175,37 @@ func (game *Game) RemoveEntity(id uuid.UUID) {
 	delete(game.Entities, id)
 }
 
+func (game *Game) StartNewRound(roundWinner uuid.UUID) {
+	game.Score = map[uuid.UUID]int{}
+	game.WaitForRound = true
+	game.NewRoundAt = time.Now().Add(time.Second * 10)
+	game.RoundWinner = roundWinner
+	game.SendChange(RoundOverChange{})
+	go func() {
+		time.Sleep(time.Second * 10)
+		game.Mu.Lock()
+		game.WaitForRound = false
+		// Respawn players.
+		i := 0
+		spawnPoints := game.GetMapSpawnPoints()
+		for _, entity := range game.Entities {
+			player, ok := entity.(*Player)
+			if !ok {
+				continue
+			}
+			player.Move(spawnPoints[i%len(spawnPoints)])
+			i++
+		}
+		game.Mu.Unlock()
+		game.SendChange(RoundStartChange{})
+	}()
+}
+
 func (game *Game) AddScore(id uuid.UUID) {
 	game.Score[id]++
 	if game.Score[id] >= 10 {
-		game.Score = make(map[uuid.UUID]int)
-		game.WaitForRound = true
-		game.NewRoundAt = time.Now().Add(time.Second * 10)
-		game.RoundWinner = id
-		game.SendChange(RoundOverChange{})
-		go func() {
-			time.Sleep(time.Second * 10)
-			game.Mu.Lock()
-			game.WaitForRound = false
-			// Respawn players.
-			i := 0
-			spawnPoints := game.GetMapSpawnPoints()
-			for _, entity := range game.Entities {
-				player, ok := entity.(*Player)
-				if !ok {
-					continue
-				}
-				player.CurrentPosition = spawnPoints[i%len(spawnPoints)]
-				i++
-			}
-			game.Mu.Unlock()
-			game.SendChange(RoundStartChange{})
-		}()
+		game.StartNewRound(id)
 	}
-}
-
-func (game *Game) Move(id uuid.UUID, position Coordinate) {
-	game.Entities[id].(Mover).Move(position)
 }
 
 func (game *Game) CheckLastActionTime(actionKey string, throttle int) bool {
@@ -346,11 +323,19 @@ func (action MoveAction) Perform(game *Game) {
 	if entity == nil {
 		return
 	}
+	mover, ok := entity.(Mover)
+	if !ok {
+		return
+	}
+	positioner, ok := entity.(Positioner)
+	if !ok {
+		return
+	}
 	actionKey := fmt.Sprintf("%T:%s", action, entity.ID().String())
 	if !game.CheckLastActionTime(actionKey, 50) {
 		return
 	}
-	position := entity.(Positioner).Position()
+	position := positioner.Position()
 	// Move the entity.
 	switch action.Direction {
 	case DirectionUp:
@@ -368,7 +353,7 @@ func (action MoveAction) Perform(game *Game) {
 			return
 		}
 	}
-	game.Move(entity.ID(), position)
+	mover.Move(position)
 	// Inform the client that the entity moved.
 	change := MoveChange{
 		Entity:    entity,
