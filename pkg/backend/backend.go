@@ -128,7 +128,7 @@ func (game *Game) watchCollisions() {
 					game.sendChange(change)
 					game.AddScore(laserOwnerID)
 					if game.Score[laserOwnerID] >= 10 {
-						game.QueueNewRound(laserOwnerID, time.Now().Add(time.Second*10))
+						game.queueNewRound(laserOwnerID, time.Now().Add(time.Second*10))
 					}
 				case *Laser:
 					change := RemoveEntityChange{
@@ -178,7 +178,7 @@ func (game *Game) RemoveEntity(id uuid.UUID) {
 	delete(game.Entities, id)
 }
 
-func (game *Game) StartNewRound() {
+func (game *Game) startNewRound() {
 	game.WaitForRound = false
 	game.Score = map[uuid.UUID]int{}
 	i := 0
@@ -194,7 +194,7 @@ func (game *Game) StartNewRound() {
 	game.sendChange(RoundStartChange{})
 }
 
-func (game *Game) QueueNewRound(roundWinner uuid.UUID, newRoundAt time.Time) {
+func (game *Game) queueNewRound(roundWinner uuid.UUID, newRoundAt time.Time) {
 	game.WaitForRound = true
 	game.NewRoundAt = newRoundAt
 	game.RoundWinner = roundWinner
@@ -202,7 +202,7 @@ func (game *Game) QueueNewRound(roundWinner uuid.UUID, newRoundAt time.Time) {
 	go func() {
 		time.Sleep(time.Second * 10)
 		game.Mu.Lock()
-		game.StartNewRound()
+		game.startNewRound()
 		game.Mu.Unlock()
 	}()
 }
