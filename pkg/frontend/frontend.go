@@ -17,11 +17,11 @@ import (
 type View struct {
 	Game          *backend.Game
 	App           *tview.Application
-	Pages         *tview.Pages
-	DrawCallbacks []func()
-	ViewPort      tview.Primitive
 	CurrentPlayer uuid.UUID
 	Paused        bool
+	pages         *tview.Pages
+	drawCallbacks []func()
+	viewPort      tview.Primitive
 }
 
 func centeredModal(p tview.Primitive) tview.Primitive {
@@ -43,13 +43,13 @@ func setupRoundWaitModal(view *View) {
 		SetBorder(true).
 		SetTitle("Round complete")
 	modal := centeredModal(textView)
-	view.Pages.AddPage("roundwait", modal, true, false)
+	view.pages.AddPage("roundwait", modal, true, false)
 
 	callback := func() {
 		view.Game.Mu.RLock()
 		defer view.Game.Mu.RUnlock()
 		if view.Game.WaitForRound {
-			view.Pages.ShowPage("roundwait")
+			view.pages.ShowPage("roundwait")
 			seconds := int(view.Game.NewRoundAt.Sub(time.Now()).Seconds())
 			if seconds < 0 {
 				seconds = 0
@@ -59,12 +59,12 @@ func setupRoundWaitModal(view *View) {
 			text += fmt.Sprintf("New round in %d seconds...", seconds)
 			textView.SetText(text)
 		} else {
-			view.Pages.HidePage("roundwait")
-			view.App.SetFocus(view.ViewPort)
+			view.pages.HidePage("roundwait")
+			view.App.SetFocus(view.viewPort)
 		}
 	}
-	view.DrawCallbacks = append(view.DrawCallbacks, callback)
-	view.Pages.AddPage("roundwait", modal, true, false)
+	view.drawCallbacks = append(view.drawCallbacks, callback)
+	view.pages.AddPage("roundwait", modal, true, false)
 }
 
 func setupScoreModal(view *View) {
@@ -110,8 +110,8 @@ func setupScoreModal(view *View) {
 		}
 		textView.SetText(text)
 	}
-	view.DrawCallbacks = append(view.DrawCallbacks, callback)
-	view.Pages.AddPage("score", modal, true, false)
+	view.drawCallbacks = append(view.drawCallbacks, callback)
+	view.pages.AddPage("score", modal, true, false)
 }
 
 func setupViewPort(view *View) {
@@ -232,8 +232,8 @@ func setupViewPort(view *View) {
 		}
 		return e
 	})
-	view.Pages.AddPage("viewport", box, true, true)
-	view.ViewPort = box
+	view.pages.AddPage("viewport", box, true, true)
+	view.viewPort = box
 }
 
 // NewView construsts a new View struct.
@@ -244,8 +244,8 @@ func NewView(game *backend.Game) *View {
 		Game:          game,
 		App:           app,
 		Paused:        false,
-		Pages:         pages,
-		DrawCallbacks: make([]func(), 0),
+		pages:         pages,
+		drawCallbacks: make([]func(), 0),
 	}
 	setupViewPort(view)
 	setupScoreModal(view)
@@ -256,7 +256,7 @@ func NewView(game *backend.Game) *View {
 		}
 		if e.Key() == tcell.KeyESC {
 			pages.HidePage("score")
-			app.SetFocus(view.ViewPort)
+			app.SetFocus(view.viewPort)
 		}
 		return e
 	})
@@ -268,7 +268,7 @@ func NewView(game *backend.Game) *View {
 func (view *View) Start() error {
 	go func() {
 		for {
-			for _, callback := range view.DrawCallbacks {
+			for _, callback := range view.drawCallbacks {
 				view.App.QueueUpdate(callback)
 			}
 			view.App.Draw()

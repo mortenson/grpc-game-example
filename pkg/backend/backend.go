@@ -13,11 +13,11 @@ import (
 // game data is rendered, or if a game server is being used.
 type Game struct {
 	Entities        map[uuid.UUID]Identifier
-	Map             [][]rune
+	gameMap         [][]rune
 	Mu              sync.RWMutex
 	ChangeChannel   chan Change
 	ActionChannel   chan Action
-	LastAction      map[string]time.Time
+	lastAction      map[string]time.Time
 	Score           map[uuid.UUID]int
 	NewRoundAt      time.Time
 	RoundWinner     uuid.UUID
@@ -30,12 +30,12 @@ func NewGame() *Game {
 	game := Game{
 		Entities:        make(map[uuid.UUID]Identifier),
 		ActionChannel:   make(chan Action, 1),
-		LastAction:      make(map[string]time.Time),
+		lastAction:      make(map[string]time.Time),
 		ChangeChannel:   make(chan Change, 1),
 		IsAuthoritative: true,
 		WaitForRound:    false,
 		Score:           make(map[uuid.UUID]int),
-		Map:             MapDefault,
+		gameMap:         MapDefault,
 	}
 	return &game
 }
@@ -114,7 +114,7 @@ func (game *Game) watchCollisions() {
 					// player died.
 					spawnPoint := spawnPoints[0]
 					for _, sp := range game.GetMapSpawnPoints() {
-						if Distance(player.Position(), sp) > Distance(player.Position(), spawnPoint) {
+						if distance(player.Position(), sp) > distance(player.Position(), spawnPoint) {
 							spawnPoint = sp
 						}
 					}
@@ -125,13 +125,16 @@ func (game *Game) watchCollisions() {
 						Player:     player,
 						KilledByID: laserOwnerID,
 					}
-					game.SendChange(change)
+					game.sendChange(change)
 					game.AddScore(laserOwnerID)
+					if game.Score[laserOwnerID] >= 10 {
+						game.QueueNewRound(laserOwnerID, time.Now().Add(time.Second*10))
+					}
 				case *Laser:
 					change := RemoveEntityChange{
 						Entity: entity,
 					}
-					game.SendChange(change)
+					game.sendChange(change)
 					game.RemoveEntity(entity.ID())
 				}
 			}
@@ -149,7 +152,7 @@ func (game *Game) watchCollisions() {
 					change := RemoveEntityChange{
 						Entity: entity,
 					}
-					game.SendChange(change)
+					game.sendChange(change)
 					game.RemoveEntity(entity.ID())
 				}
 			}
@@ -175,52 +178,52 @@ func (game *Game) RemoveEntity(id uuid.UUID) {
 	delete(game.Entities, id)
 }
 
-func (game *Game) StartNewRound(roundWinner uuid.UUID) {
+func (game *Game) StartNewRound() {
+	game.WaitForRound = false
 	game.Score = map[uuid.UUID]int{}
+	i := 0
+	spawnPoints := game.GetMapSpawnPoints()
+	for _, entity := range game.Entities {
+		player, ok := entity.(*Player)
+		if !ok {
+			continue
+		}
+		player.Move(spawnPoints[i%len(spawnPoints)])
+		i++
+	}
+	game.sendChange(RoundStartChange{})
+}
+
+func (game *Game) QueueNewRound(roundWinner uuid.UUID, newRoundAt time.Time) {
 	game.WaitForRound = true
-	game.NewRoundAt = time.Now().Add(time.Second * 10)
+	game.NewRoundAt = newRoundAt
 	game.RoundWinner = roundWinner
-	game.SendChange(RoundOverChange{})
+	game.sendChange(RoundOverChange{})
 	go func() {
 		time.Sleep(time.Second * 10)
 		game.Mu.Lock()
-		game.WaitForRound = false
-		// Respawn players.
-		i := 0
-		spawnPoints := game.GetMapSpawnPoints()
-		for _, entity := range game.Entities {
-			player, ok := entity.(*Player)
-			if !ok {
-				continue
-			}
-			player.Move(spawnPoints[i%len(spawnPoints)])
-			i++
-		}
+		game.StartNewRound()
 		game.Mu.Unlock()
-		game.SendChange(RoundStartChange{})
 	}()
 }
 
 func (game *Game) AddScore(id uuid.UUID) {
 	game.Score[id]++
-	if game.Score[id] >= 10 {
-		game.StartNewRound(id)
-	}
 }
 
-func (game *Game) CheckLastActionTime(actionKey string, throttle int) bool {
-	lastAction, ok := game.LastAction[actionKey]
+func (game *Game) checkLastActionTime(actionKey string, throttle int) bool {
+	lastAction, ok := game.lastAction[actionKey]
 	if ok && lastAction.After(time.Now().Add(-1*time.Duration(throttle)*time.Millisecond)) {
 		return false
 	}
 	return true
 }
 
-func (game *Game) UpdateLastActionTime(actionKey string) {
-	game.LastAction[actionKey] = time.Now()
+func (game *Game) updateLastActionTime(actionKey string) {
+	game.lastAction[actionKey] = time.Now()
 }
 
-func (game *Game) SendChange(change Change) {
+func (game *Game) sendChange(change Change) {
 	select {
 	case game.ChangeChannel <- change:
 	default:
@@ -233,7 +236,7 @@ type Coordinate struct {
 	Y int
 }
 
-func Distance(a Coordinate, b Coordinate) int {
+func distance(a Coordinate, b Coordinate) int {
 	return int(math.Sqrt(math.Pow(float64(b.X-a.X), 2) + math.Pow(float64(b.Y-a.Y), 2)))
 }
 
@@ -332,7 +335,7 @@ func (action MoveAction) Perform(game *Game) {
 		return
 	}
 	actionKey := fmt.Sprintf("%T:%s", action, entity.ID().String())
-	if !game.CheckLastActionTime(actionKey, 50) {
+	if !game.checkLastActionTime(actionKey, 50) {
 		return
 	}
 	position := positioner.Position()
@@ -360,6 +363,6 @@ func (action MoveAction) Perform(game *Game) {
 		Direction: action.Direction,
 		Position:  position,
 	}
-	game.SendChange(change)
-	game.UpdateLastActionTime(actionKey)
+	game.sendChange(change)
+	game.updateLastActionTime(actionKey)
 }

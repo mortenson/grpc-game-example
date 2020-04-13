@@ -20,34 +20,129 @@ type client struct {
 // GameServer is used to stream game information with clients.
 type GameServer struct {
 	proto.UnimplementedGameServer
-	Game    *backend.Game
-	Clients map[uuid.UUID]*client
-	Mux     sync.RWMutex
+	game    *backend.Game
+	clients map[uuid.UUID]*client
+	mu      sync.RWMutex
 }
 
 // NewGameServer constructs a new game server struct.
 func NewGameServer(game *backend.Game) *GameServer {
-	server := &GameServer{Game: game, Clients: make(map[uuid.UUID]*client)}
+	server := &GameServer{game: game, clients: make(map[uuid.UUID]*client)}
 	server.WatchChanges()
 	return server
 }
 
-// Broadcast sends a response to all clients.
-func (s *GameServer) Broadcast(resp *proto.Response) {
-	s.Mux.RLock()
-	defer s.Mux.RUnlock()
-	for name, client := range s.Clients {
-		if err := client.StreamServer.Send(resp); err != nil {
-			log.Printf("broadcast error %v", err)
+// removeClient removes a client from the game, usually in response to a logout
+// or series error.
+func (s *GameServer) removeClient(playerID uuid.UUID) {
+	delete(s.clients, playerID)
+
+	s.game.Mu.Lock()
+	s.game.RemoveEntity(playerID)
+	s.game.Mu.Unlock()
+
+	resp := proto.Response{
+		Action: &proto.Response_RemoveEntity{
+			RemoveEntity: &proto.RemoveEntity{
+				Id: playerID.String(),
+			},
+		},
+	}
+	s.broadcast(&resp)
+}
+
+// Stream is the main loop for dealing with individual players.
+func (s *GameServer) Stream(srv proto.Game_StreamServer) error {
+	log.Println("start new server")
+	ctx := srv.Context()
+	var playerID uuid.UUID
+	isConnected := false
+	for {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		default:
 		}
-		log.Printf("broadcasted %+v message to %s", resp, name)
+
+		req, err := srv.Recv()
+		if err != nil {
+			log.Printf("receive error %v", err)
+			if isConnected {
+				s.game.Mu.Lock()
+				s.removeClient(playerID)
+				s.game.Mu.Unlock()
+			}
+			continue
+		}
+		log.Printf("got message %+v", req)
+
+		if req.GetConnect() != nil {
+			playerID = s.handleConnectRequest(req, srv)
+			isConnected = true
+		}
+
+		if !isConnected {
+			continue
+		}
+
+		switch req.GetAction().(type) {
+		case *proto.Request_Move:
+			s.handleMoveRequest(playerID, req, srv)
+		case *proto.Request_Laser:
+			s.handleLaserRequest(playerID, req, srv)
+		}
 	}
 }
 
-// HandleConnectRequest processes new players.
-func (s *GameServer) HandleConnectRequest(req *proto.Request, srv proto.Game_StreamServer) uuid.UUID {
-	s.Game.Mu.Lock()
-	defer s.Game.Mu.Unlock()
+// WatchChanges waits for new game engine changes and broadcasts to clients.
+func (s *GameServer) WatchChanges() {
+	go func() {
+		for {
+			change := <-s.game.ChangeChannel
+			switch change.(type) {
+			case backend.MoveChange:
+				change := change.(backend.MoveChange)
+				s.handleMoveChange(change)
+			case backend.AddEntityChange:
+				change := change.(backend.AddEntityChange)
+				s.handleAddEntityChange(change)
+			case backend.RemoveEntityChange:
+				change := change.(backend.RemoveEntityChange)
+				s.handleRemoveEntityChange(change)
+			case backend.PlayerRespawnChange:
+				change := change.(backend.PlayerRespawnChange)
+				s.handlePlayerRespawnChange(change)
+			case backend.RoundOverChange:
+				change := change.(backend.RoundOverChange)
+				s.handleRoundOverChange(change)
+			case backend.RoundStartChange:
+				change := change.(backend.RoundStartChange)
+				s.handleRoundStartChange(change)
+			}
+		}
+	}()
+}
+
+// broadcast sends a response to all clients.
+func (s *GameServer) broadcast(resp *proto.Response) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	for id, client := range s.clients {
+		if err := client.StreamServer.Send(resp); err != nil {
+			log.Printf("broadcast error %v, removing %s", err, id)
+			s.game.Mu.Lock()
+			s.removeClient(id)
+			s.game.Mu.Unlock()
+		}
+		log.Printf("broadcasted %+v message to %s", resp, id)
+	}
+}
+
+// handleConnectRequest processes new players.
+func (s *GameServer) handleConnectRequest(req *proto.Request, srv proto.Game_StreamServer) uuid.UUID {
+	s.game.Mu.Lock()
+	defer s.game.Mu.Unlock()
 
 	connect := req.GetConnect()
 
@@ -65,11 +160,11 @@ func (s *GameServer) HandleConnectRequest(req *proto.Request, srv proto.Game_Str
 		IdentifierBase:  backend.IdentifierBase{UUID: playerID},
 		CurrentPosition: startCoordinate,
 	}
-	s.Game.AddEntity(player)
+	s.game.AddEntity(player)
 
 	// Build a slice of current entities.
 	entities := make([]*proto.Entity, 0)
-	for _, entity := range s.Game.Entities {
+	for _, entity := range s.game.Entities {
 		protoEntity := proto.GetProtoEntity(entity)
 		if protoEntity != nil {
 			entities = append(entities, protoEntity)
@@ -99,106 +194,43 @@ func (s *GameServer) HandleConnectRequest(req *proto.Request, srv proto.Game_Str
 			},
 		},
 	}
-	s.Broadcast(&resp)
+	s.broadcast(&resp)
 
 	// Add the new client.
-	s.Mux.Lock()
-	s.Clients[player.ID()] = &client{
+	s.mu.Lock()
+	s.clients[player.ID()] = &client{
 		StreamServer: srv,
 	}
-	s.Mux.Unlock()
+	s.mu.Unlock()
 
 	// Return the new player ID.
 	return player.ID()
 }
 
-// HandleMoveRequest makes a request to the game engine to move a player.
-func (s *GameServer) HandleMoveRequest(playerID uuid.UUID, req *proto.Request, srv proto.Game_StreamServer) {
+// handleMoveRequest makes a request to the game engine to move a player.
+func (s *GameServer) handleMoveRequest(playerID uuid.UUID, req *proto.Request, srv proto.Game_StreamServer) {
 	move := req.GetMove()
-	s.Game.ActionChannel <- backend.MoveAction{
+	s.game.ActionChannel <- backend.MoveAction{
 		ID:        playerID,
 		Direction: proto.GetBackendDirection(move.Direction),
 	}
 }
 
-func (s *GameServer) HandleLaserRequest(playerID uuid.UUID, req *proto.Request, srv proto.Game_StreamServer) {
+func (s *GameServer) handleLaserRequest(playerID uuid.UUID, req *proto.Request, srv proto.Game_StreamServer) {
 	laser := req.GetLaser()
 	id, err := uuid.Parse(laser.Id)
 	if err != nil {
 		// @todo handle
 		return
 	}
-	s.Game.ActionChannel <- backend.LaserAction{
+	s.game.ActionChannel <- backend.LaserAction{
 		OwnerID:   playerID,
 		ID:        id,
 		Direction: proto.GetBackendDirection(laser.Direction),
 	}
 }
 
-// RemoveClient removes a client from the game, usually in response to a logout
-// or series error.
-func (s *GameServer) RemoveClient(playerID uuid.UUID, srv proto.Game_StreamServer) {
-	s.Game.Mu.Lock()
-	defer s.Game.Mu.Unlock()
-
-	s.Mux.Lock()
-	delete(s.Clients, playerID)
-	s.Mux.Unlock()
-
-	s.Game.RemoveEntity(playerID)
-
-	resp := proto.Response{
-		Action: &proto.Response_RemoveEntity{
-			RemoveEntity: &proto.RemoveEntity{
-				Id: playerID.String(),
-			},
-		},
-	}
-	s.Broadcast(&resp)
-}
-
-// Stream is the main loop for dealing with individual players.
-func (s *GameServer) Stream(srv proto.Game_StreamServer) error {
-	log.Println("start new server")
-	ctx := srv.Context()
-	var playerID uuid.UUID
-	isConnected := false
-	for {
-		select {
-		case <-ctx.Done():
-			return ctx.Err()
-		default:
-		}
-
-		req, err := srv.Recv()
-		if err != nil {
-			log.Printf("receive error %v", err)
-			if isConnected {
-				s.RemoveClient(playerID, srv)
-			}
-			continue
-		}
-		log.Printf("got message %+v", req)
-
-		if req.GetConnect() != nil {
-			playerID = s.HandleConnectRequest(req, srv)
-			isConnected = true
-		}
-
-		if !isConnected {
-			continue
-		}
-
-		switch req.GetAction().(type) {
-		case *proto.Request_Move:
-			s.HandleMoveRequest(playerID, req, srv)
-		case *proto.Request_Laser:
-			s.HandleLaserRequest(playerID, req, srv)
-		}
-	}
-}
-
-func (s *GameServer) HandleMoveChange(change backend.MoveChange) {
+func (s *GameServer) handleMoveChange(change backend.MoveChange) {
 	resp := proto.Response{
 		Action: &proto.Response_UpdateEntity{
 			UpdateEntity: &proto.UpdateEntity{
@@ -206,10 +238,10 @@ func (s *GameServer) HandleMoveChange(change backend.MoveChange) {
 			},
 		},
 	}
-	s.Broadcast(&resp)
+	s.broadcast(&resp)
 }
 
-func (s *GameServer) HandleAddEntityChange(change backend.AddEntityChange) {
+func (s *GameServer) handleAddEntityChange(change backend.AddEntityChange) {
 	resp := proto.Response{
 		Action: &proto.Response_AddEntity{
 			AddEntity: &proto.AddEntity{
@@ -217,10 +249,10 @@ func (s *GameServer) HandleAddEntityChange(change backend.AddEntityChange) {
 			},
 		},
 	}
-	s.Broadcast(&resp)
+	s.broadcast(&resp)
 }
 
-func (s *GameServer) HandleRemoveEntityChange(change backend.RemoveEntityChange) {
+func (s *GameServer) handleRemoveEntityChange(change backend.RemoveEntityChange) {
 	resp := proto.Response{
 		Action: &proto.Response_RemoveEntity{
 			RemoveEntity: &proto.RemoveEntity{
@@ -228,10 +260,10 @@ func (s *GameServer) HandleRemoveEntityChange(change backend.RemoveEntityChange)
 			},
 		},
 	}
-	s.Broadcast(&resp)
+	s.broadcast(&resp)
 }
 
-func (s *GameServer) HandlePlayerRespawnChange(change backend.PlayerRespawnChange) {
+func (s *GameServer) handlePlayerRespawnChange(change backend.PlayerRespawnChange) {
 	resp := proto.Response{
 		Action: &proto.Response_PlayerRespawn{
 			PlayerRespawn: &proto.PlayerRespawn{
@@ -240,38 +272,38 @@ func (s *GameServer) HandlePlayerRespawnChange(change backend.PlayerRespawnChang
 			},
 		},
 	}
-	s.Broadcast(&resp)
+	s.broadcast(&resp)
 }
 
-func (s *GameServer) HandleRoundOverChange(change backend.RoundOverChange) {
-	s.Game.Mu.RLock()
-	defer s.Game.Mu.RUnlock()
-	timestamp, err := ptypes.TimestampProto(s.Game.NewRoundAt)
+func (s *GameServer) handleRoundOverChange(change backend.RoundOverChange) {
+	s.game.Mu.RLock()
+	defer s.game.Mu.RUnlock()
+	timestamp, err := ptypes.TimestampProto(s.game.NewRoundAt)
 	if err != nil {
 		return
 	}
 	resp := proto.Response{
 		Action: &proto.Response_RoundOver{
 			RoundOver: &proto.RoundOver{
-				RoundWinnerId: s.Game.RoundWinner.String(),
+				RoundWinnerId: s.game.RoundWinner.String(),
 				NewRoundAt:    timestamp,
 			},
 		},
 	}
-	s.Broadcast(&resp)
+	s.broadcast(&resp)
 }
 
-func (s *GameServer) HandleRoundStartChange(change backend.RoundStartChange) {
+func (s *GameServer) handleRoundStartChange(change backend.RoundStartChange) {
 	players := []*proto.Player{}
-	s.Game.Mu.RLock()
-	for _, entity := range s.Game.Entities {
+	s.game.Mu.RLock()
+	for _, entity := range s.game.Entities {
 		player, ok := entity.(*backend.Player)
 		if !ok {
 			continue
 		}
 		players = append(players, proto.GetProtoPlayer(player))
 	}
-	s.Game.Mu.RUnlock()
+	s.game.Mu.RUnlock()
 	resp := proto.Response{
 		Action: &proto.Response_RoundStart{
 			RoundStart: &proto.RoundStart{
@@ -279,34 +311,5 @@ func (s *GameServer) HandleRoundStartChange(change backend.RoundStartChange) {
 			},
 		},
 	}
-	s.Broadcast(&resp)
-}
-
-// WatchChanges waits for new game engine changes and broadcasts to clients.
-func (s *GameServer) WatchChanges() {
-	go func() {
-		for {
-			change := <-s.Game.ChangeChannel
-			switch change.(type) {
-			case backend.MoveChange:
-				change := change.(backend.MoveChange)
-				s.HandleMoveChange(change)
-			case backend.AddEntityChange:
-				change := change.(backend.AddEntityChange)
-				s.HandleAddEntityChange(change)
-			case backend.RemoveEntityChange:
-				change := change.(backend.RemoveEntityChange)
-				s.HandleRemoveEntityChange(change)
-			case backend.PlayerRespawnChange:
-				change := change.(backend.PlayerRespawnChange)
-				s.HandlePlayerRespawnChange(change)
-			case backend.RoundOverChange:
-				change := change.(backend.RoundOverChange)
-				s.HandleRoundOverChange(change)
-			case backend.RoundStartChange:
-				change := change.(backend.RoundStartChange)
-				s.HandleRoundStartChange(change)
-			}
-		}
-	}()
+	s.broadcast(&resp)
 }

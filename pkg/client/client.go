@@ -54,10 +54,10 @@ func (c *GameClient) Start() {
 			switch change.(type) {
 			case backend.MoveChange:
 				change := change.(backend.MoveChange)
-				c.HandleMoveChange(change)
+				c.handleMoveChange(change)
 			case backend.AddEntityChange:
 				change := change.(backend.AddEntityChange)
-				c.HandleAddEntityChange(change)
+				c.handleAddEntityChange(change)
 			}
 		}
 	}()
@@ -73,27 +73,29 @@ func (c *GameClient) Start() {
 				log.Fatalf("can not receive %v", err)
 			}
 
+			c.Game.Mu.Lock()
 			switch resp.GetAction().(type) {
 			case *proto.Response_Initialize:
-				c.HandleInitializeResponse(resp)
+				c.handleInitializeResponse(resp)
 			case *proto.Response_AddEntity:
-				c.HandleAddEntityResponse(resp)
+				c.handleAddEntityResponse(resp)
 			case *proto.Response_UpdateEntity:
-				c.HandleUpdateEntityResponse(resp)
+				c.handleUpdateEntityResponse(resp)
 			case *proto.Response_RemoveEntity:
-				c.HandleRemoveEntityResponse(resp)
+				c.handleRemoveEntityResponse(resp)
 			case *proto.Response_PlayerRespawn:
-				c.HandlePlayerRespawnResponse(resp)
+				c.handlePlayerRespawnResponse(resp)
 			case *proto.Response_RoundOver:
-				c.HandleRoundOverResponse(resp)
+				c.handleRoundOverResponse(resp)
 			case *proto.Response_RoundStart:
-				c.HandleRoundStartResponse(resp)
+				c.handleRoundStartResponse(resp)
 			}
+			c.Game.Mu.Unlock()
 		}
 	}()
 }
 
-func (c *GameClient) HandleMoveChange(change backend.MoveChange) {
+func (c *GameClient) handleMoveChange(change backend.MoveChange) {
 	req := proto.Request{
 		Action: &proto.Request_Move{
 			Move: &proto.Move{
@@ -105,7 +107,7 @@ func (c *GameClient) HandleMoveChange(change backend.MoveChange) {
 }
 
 // @todo Is this the right way to respond to changes?
-func (c *GameClient) HandleAddEntityChange(change backend.AddEntityChange) {
+func (c *GameClient) handleAddEntityChange(change backend.AddEntityChange) {
 	switch change.Entity.(type) {
 	case *backend.Laser:
 		laser := change.Entity.(*backend.Laser)
@@ -120,9 +122,7 @@ func (c *GameClient) HandleAddEntityChange(change backend.AddEntityChange) {
 
 // HandleInitializeResponse initializes the local player with information
 // provided by the server.
-func (c *GameClient) HandleInitializeResponse(resp *proto.Response) {
-	c.Game.Mu.Lock()
-	defer c.Game.Mu.Unlock()
+func (c *GameClient) handleInitializeResponse(resp *proto.Response) {
 	init := resp.GetInitialize()
 	for _, entity := range init.Entities {
 		backendEntity := proto.GetBackendEntity(entity)
@@ -136,9 +136,7 @@ func (c *GameClient) HandleInitializeResponse(resp *proto.Response) {
 	c.View.Paused = false
 }
 
-func (c *GameClient) HandleAddEntityResponse(resp *proto.Response) {
-	c.Game.Mu.Lock()
-	defer c.Game.Mu.Unlock()
+func (c *GameClient) handleAddEntityResponse(resp *proto.Response) {
 	add := resp.GetAddEntity()
 	entity := proto.GetBackendEntity(add.Entity)
 	if entity == nil {
@@ -148,9 +146,7 @@ func (c *GameClient) HandleAddEntityResponse(resp *proto.Response) {
 	c.Game.AddEntity(entity)
 }
 
-func (c *GameClient) HandleUpdateEntityResponse(resp *proto.Response) {
-	c.Game.Mu.Lock()
-	defer c.Game.Mu.Unlock()
+func (c *GameClient) handleUpdateEntityResponse(resp *proto.Response) {
 	update := resp.GetUpdateEntity()
 	entity := proto.GetBackendEntity(update.Entity)
 	if entity == nil {
@@ -160,9 +156,7 @@ func (c *GameClient) HandleUpdateEntityResponse(resp *proto.Response) {
 	c.Game.UpdateEntity(entity)
 }
 
-func (c *GameClient) HandleRemoveEntityResponse(resp *proto.Response) {
-	c.Game.Mu.Lock()
-	defer c.Game.Mu.Unlock()
+func (c *GameClient) handleRemoveEntityResponse(resp *proto.Response) {
 	remove := resp.GetRemoveEntity()
 	id, err := uuid.Parse(remove.Id)
 	if err != nil {
@@ -172,9 +166,7 @@ func (c *GameClient) HandleRemoveEntityResponse(resp *proto.Response) {
 	c.Game.RemoveEntity(id)
 }
 
-func (c *GameClient) HandlePlayerRespawnResponse(resp *proto.Response) {
-	c.Game.Mu.Lock()
-	defer c.Game.Mu.Unlock()
+func (c *GameClient) handlePlayerRespawnResponse(resp *proto.Response) {
 	respawn := resp.GetPlayerRespawn()
 	killedByID, err := uuid.Parse(respawn.KilledById)
 	if err != nil {
@@ -190,9 +182,7 @@ func (c *GameClient) HandlePlayerRespawnResponse(resp *proto.Response) {
 	c.Game.UpdateEntity(player)
 }
 
-func (c *GameClient) HandleRoundOverResponse(resp *proto.Response) {
-	c.Game.Mu.Lock()
-	defer c.Game.Mu.Unlock()
+func (c *GameClient) handleRoundOverResponse(resp *proto.Response) {
 	respawn := resp.GetRoundOver()
 	roundWinner, err := uuid.Parse(respawn.RoundWinnerId)
 	if err != nil {
@@ -210,9 +200,7 @@ func (c *GameClient) HandleRoundOverResponse(resp *proto.Response) {
 	c.Game.Score = make(map[uuid.UUID]int)
 }
 
-func (c *GameClient) HandleRoundStartResponse(resp *proto.Response) {
-	c.Game.Mu.Lock()
-	defer c.Game.Mu.Unlock()
+func (c *GameClient) handleRoundStartResponse(resp *proto.Response) {
 	roundStart := resp.GetRoundStart()
 	c.Game.WaitForRound = false
 	for _, protoPlayer := range roundStart.Players {

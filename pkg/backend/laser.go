@@ -46,7 +46,7 @@ func (action LaserAction) Perform(game *Game) {
 		return
 	}
 	actionKey := fmt.Sprintf("%T:%s", action, entity.ID().String())
-	if !game.CheckLastActionTime(actionKey, 500) {
+	if !game.checkLastActionTime(actionKey, 500) {
 		return
 	}
 	laser := Laser{
@@ -71,11 +71,6 @@ func (action LaserAction) Perform(game *Game) {
 	change := AddEntityChange{
 		Entity: &laser,
 	}
-	select {
-	case game.ChangeChannel <- change:
-		// no-op.
-	default:
-		// no-op.
-	}
-	game.UpdateLastActionTime(actionKey)
+	game.sendChange(change)
+	game.updateLastActionTime(actionKey)
 }

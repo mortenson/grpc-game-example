@@ -1,10 +1,10 @@
 package backend
 
-func (game *Game) GetMapSymbols() map[rune][]Coordinate {
-	mapCenterX := len(game.Map[0]) / 2
-	mapCenterY := len(game.Map) / 2
+func (game *Game) getMapSymbols() map[rune][]Coordinate {
+	mapCenterX := len(game.gameMap[0]) / 2
+	mapCenterY := len(game.gameMap) / 2
 	symbols := make(map[rune][]Coordinate, 0)
-	for mapY, row := range game.Map {
+	for mapY, row := range game.gameMap {
 		for mapX, col := range row {
 			if col == ' ' {
 				continue
@@ -19,11 +19,11 @@ func (game *Game) GetMapSymbols() map[rune][]Coordinate {
 }
 
 func (game *Game) GetMapWalls() []Coordinate {
-	return game.GetMapSymbols()['█']
+	return game.getMapSymbols()['█']
 }
 
 func (game *Game) GetMapSpawnPoints() []Coordinate {
-	return game.GetMapSymbols()['S']
+	return game.getMapSymbols()['S']
 }
 
 var MapDefault = [][]rune{
