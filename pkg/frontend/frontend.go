@@ -266,14 +266,13 @@ func NewView(game *backend.Game) *View {
 
 // Start starts the frontend game loop.
 func (view *View) Start() error {
-	// Main loop - re-draw at ~60 FPS.
 	go func() {
 		for {
 			for _, callback := range view.DrawCallbacks {
 				view.App.QueueUpdate(callback)
 			}
 			view.App.Draw()
-			time.Sleep(17 * time.Microsecond)
+			time.Sleep(17 * time.Millisecond)
 		}
 	}()
 	return view.App.Run()
