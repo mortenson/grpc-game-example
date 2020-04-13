@@ -155,15 +155,6 @@ func setupViewPort(view *View) {
 		height = height - 1
 		centerY := (y + height/2) - cameraY
 		centerX := (x + width/2) - cameraX
-		// Draw map
-		for _, wall := range view.Game.GetMapWalls() {
-			x := centerX + wall.X
-			y := centerY + wall.Y
-			if !withinDrawBounds(x, y, width, height) {
-				continue
-			}
-			screen.SetContent(x, y, '█', nil, style.Foreground(tcell.ColorWhite))
-		}
 		// Draw center point - useful for debugging
 		// if withinDrawBounds(centerX, centerY, width, height) {
 		// 	screen.SetContent(centerX, centerY, 'C', nil, style.Foreground(tcell.ColorWhite))
@@ -194,6 +185,15 @@ func setupViewPort(view *View) {
 			}
 			// See if player is far from center of viewport.
 			screen.SetContent(drawX, drawY, icon, nil, style.Foreground(color))
+		}
+		// Draw map
+		for _, wall := range view.Game.GetMapWalls() {
+			x := centerX + wall.X
+			y := centerY + wall.Y
+			if !withinDrawBounds(x, y, width, height) {
+				continue
+			}
+			screen.SetContent(x, y, '█', nil, style.Foreground(tcell.ColorWhite))
 		}
 		return 0, 0, 0, 0
 	})
