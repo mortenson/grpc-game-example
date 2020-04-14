@@ -32,11 +32,7 @@ func NewGameServer(game *backend.Game) *GameServer {
 	return server
 }
 
-// removeClient removes a client from the game, usually in response to a logout
-// or series error.
-func (s *GameServer) removeClient(playerID uuid.UUID) {
-	delete(s.clients, playerID)
-
+func (s *GameServer) removePlayer(playerID uuid.UUID) {
 	s.game.Mu.Lock()
 	s.game.RemoveEntity(playerID)
 	s.game.Mu.Unlock()
@@ -68,9 +64,10 @@ func (s *GameServer) Stream(srv proto.Game_StreamServer) error {
 		if err != nil {
 			log.Printf("receive error %v", err)
 			if isConnected {
-				s.game.Mu.Lock()
-				s.removeClient(playerID)
-				s.game.Mu.Unlock()
+				s.mu.Lock()
+				delete(s.clients, playerID)
+				s.mu.Unlock()
+				s.removePlayer(playerID)
 			}
 			continue
 		}
@@ -125,17 +122,19 @@ func (s *GameServer) WatchChanges() {
 
 // broadcast sends a response to all clients.
 func (s *GameServer) broadcast(resp *proto.Response) {
+	removals := []uuid.UUID{}
 	s.mu.Lock()
-	defer s.mu.Unlock()
-
 	for id, client := range s.clients {
 		if err := client.StreamServer.Send(resp); err != nil {
 			log.Printf("broadcast error %v, removing %s", err, id)
-			s.game.Mu.Lock()
-			s.removeClient(id)
-			s.game.Mu.Unlock()
+			delete(s.clients, id)
+			removals = append(removals, id)
 		}
 		log.Printf("broadcasted %+v message to %s", resp, id)
+	}
+	s.mu.Unlock()
+	for _, id := range removals {
+		s.removePlayer(id)
 	}
 }
 
