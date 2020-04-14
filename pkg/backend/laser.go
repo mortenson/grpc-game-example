@@ -19,7 +19,7 @@ type Laser struct {
 
 func (laser *Laser) Position() Coordinate {
 	difference := time.Now().Sub(laser.StartTime)
-	moves := int(math.Floor(float64(difference.Milliseconds()) / float64(20)))
+	moves := int(math.Floor(float64(difference.Milliseconds()) / float64(21)))
 	position := laser.InitialPosition
 	switch laser.Direction {
 	case DirectionUp:
