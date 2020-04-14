@@ -122,13 +122,13 @@ func setupViewPort(view *View) {
 	box := tview.NewBox().
 		SetBorder(true).
 		SetTitle("grpc-game-example").
-		SetBackgroundColor(tcell.ColorBlack)
+		SetBackgroundColor(tcell.Color234)
 	cameraX := 0
 	cameraY := 0
 	box.SetDrawFunc(func(screen tcell.Screen, x int, y int, width int, height int) (int, int, int, int) {
 		view.Game.Mu.RLock()
 		defer view.Game.Mu.RUnlock()
-		style := tcell.StyleDefault.Background(tcell.ColorBlack)
+		style := tcell.StyleDefault.Background(tcell.Color234)
 		// Move camera
 		currentEntity := view.Game.GetEntity(view.CurrentPlayer)
 		if currentEntity == nil {
@@ -176,7 +176,7 @@ func setupViewPort(view *View) {
 			switch entity.(type) {
 			case *backend.Player:
 				icon = entity.(*backend.Player).Icon
-				color = tcell.ColorGreen
+				color = tcell.ColorWhite
 			case *backend.Laser:
 				icon = 'x'
 				color = tcell.ColorRed
@@ -193,7 +193,7 @@ func setupViewPort(view *View) {
 			if !withinDrawBounds(x, y, width, height) {
 				continue
 			}
-			screen.SetContent(x, y, '█', nil, style.Foreground(tcell.ColorWhite))
+			screen.SetContent(x, y, '█', nil, style.Foreground(tcell.Color24))
 		}
 		return 0, 0, 0, 0
 	})
