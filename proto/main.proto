@@ -27,6 +27,7 @@ message Player {
     string id = 1;
     string name = 2;
     Coordinate position = 3;
+    string icon = 4;
 }
 
 message Laser {
