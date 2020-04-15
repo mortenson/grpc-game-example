@@ -43,6 +43,7 @@ func setupRoundWaitModal(view *View) {
 	textView.SetTextAlign(tview.AlignCenter).
 		SetScrollable(true).
 		SetBorder(true).
+		SetBackgroundColor(backgroundColor).
 		SetTitle("Round complete")
 	modal := centeredModal(textView)
 	view.pages.AddPage("roundwait", modal, true, false)

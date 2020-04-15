@@ -1,9 +1,14 @@
 package server
 
 import (
+	"context"
+	"errors"
 	"log"
+	"regexp"
+	"strings"
 	"sync"
 	"time"
+	"unicode/utf8"
 
 	"github.com/golang/protobuf/ptypes"
 	"github.com/google/uuid"
@@ -15,6 +20,8 @@ import (
 // client contains information about connected clients.
 type client struct {
 	StreamServer proto.Game_StreamServer
+	Cancel       context.CancelFunc
+	ID           uuid.UUID
 }
 
 // GameServer is used to stream game information with clients.
@@ -30,6 +37,11 @@ func NewGameServer(game *backend.Game) *GameServer {
 	server := &GameServer{game: game, clients: make(map[uuid.UUID]*client)}
 	server.WatchChanges()
 	return server
+}
+
+func (s *GameServer) removeClient(currentClient *client) {
+	delete(s.clients, currentClient.ID)
+	currentClient.Cancel()
 }
 
 func (s *GameServer) removePlayer(playerID uuid.UUID) {
@@ -50,12 +62,12 @@ func (s *GameServer) removePlayer(playerID uuid.UUID) {
 // Stream is the main loop for dealing with individual players.
 func (s *GameServer) Stream(srv proto.Game_StreamServer) error {
 	log.Println("start new server")
-	ctx := srv.Context()
-	var playerID uuid.UUID
-	isConnected := false
+	ctx, cancel := context.WithCancel(srv.Context())
+	var currentClient *client
 	for {
 		select {
 		case <-ctx.Done():
+			log.Printf("stream done with error \"%v\"", ctx.Err())
 			return ctx.Err()
 		default:
 		}
@@ -63,30 +75,42 @@ func (s *GameServer) Stream(srv proto.Game_StreamServer) error {
 		req, err := srv.Recv()
 		if err != nil {
 			log.Printf("receive error %v", err)
-			if isConnected {
+			if currentClient != nil {
 				s.mu.Lock()
-				delete(s.clients, playerID)
+				s.removeClient(currentClient)
 				s.mu.Unlock()
-				s.removePlayer(playerID)
+				s.removePlayer(currentClient.ID)
 			}
-			continue
+			return err
 		}
 		log.Printf("got message %+v", req)
 
-		if req.GetConnect() != nil {
-			playerID = s.handleConnectRequest(req, srv)
-			isConnected = true
+		if currentClient == nil && req.GetConnect() != nil {
+			playerID, err := s.handleConnectRequest(req, srv)
+			if err != nil {
+				log.Printf("error when connecting %s: %+v", playerID.String(), err)
+				return err
+			}
+			// Add the new client.
+			s.mu.Lock()
+			currentClient = &client{
+				StreamServer: srv,
+				Cancel:       cancel,
+				ID:           playerID,
+			}
+			s.clients[playerID] = currentClient
+			s.mu.Unlock()
 		}
 
-		if !isConnected {
+		if currentClient == nil {
 			continue
 		}
 
 		switch req.GetAction().(type) {
 		case *proto.Request_Move:
-			s.handleMoveRequest(playerID, req, srv)
+			s.handleMoveRequest(req, currentClient)
 		case *proto.Request_Laser:
-			s.handleLaserRequest(playerID, req, srv)
+			s.handleLaserRequest(req, currentClient)
 		}
 	}
 }
@@ -124,10 +148,10 @@ func (s *GameServer) WatchChanges() {
 func (s *GameServer) broadcast(resp *proto.Response) {
 	removals := []uuid.UUID{}
 	s.mu.Lock()
-	for id, client := range s.clients {
-		if err := client.StreamServer.Send(resp); err != nil {
+	for id, currentClient := range s.clients {
+		if err := currentClient.StreamServer.Send(resp); err != nil {
 			log.Printf("broadcast error %v, removing %s", err, id)
-			delete(s.clients, id)
+			s.removeClient(currentClient)
 			removals = append(removals, id)
 		}
 		log.Printf("broadcasted %+v message to %s", resp, id)
@@ -139,29 +163,39 @@ func (s *GameServer) broadcast(resp *proto.Response) {
 }
 
 // handleConnectRequest processes new players.
-func (s *GameServer) handleConnectRequest(req *proto.Request, srv proto.Game_StreamServer) uuid.UUID {
-	s.game.Mu.Lock()
-	defer s.game.Mu.Unlock()
+func (s *GameServer) handleConnectRequest(req *proto.Request, srv proto.Game_StreamServer) (uuid.UUID, error) {
+	// When testing locally the connection was too fast, so sometimes
+	// connecting would fail. @todo investigate a better fix.
+	time.Sleep(time.Second * 1)
 
 	connect := req.GetConnect()
+
+	playerID, err := uuid.Parse(connect.Id)
+	if err != nil {
+		return playerID, err
+	}
+	re := regexp.MustCompile("^[a-zA-Z0-9]+$")
+	if !re.MatchString(connect.Name) {
+		return playerID, errors.New("invalid name provided")
+	}
+	icon, _ := utf8.DecodeRuneInString(strings.ToUpper(connect.Name))
 
 	// @todo Choose a start position away from other players?
 	startCoordinate := backend.Coordinate{X: 0, Y: 0}
 
-	// Add the new player.
-	playerID, err := uuid.Parse(connect.Id)
-	if err != nil {
-		// @todo handle
-	}
+	// Add the player.
 	player := &backend.Player{
 		Name:            connect.Name,
-		Icon:            'P',
+		Icon:            icon,
 		IdentifierBase:  backend.IdentifierBase{UUID: playerID},
 		CurrentPosition: startCoordinate,
 	}
+	s.game.Mu.Lock()
 	s.game.AddEntity(player)
+	s.game.Mu.Unlock()
 
 	// Build a slice of current entities.
+	s.game.Mu.RLock()
 	entities := make([]*proto.Entity, 0)
 	for _, entity := range s.game.Entities {
 		protoEntity := proto.GetProtoEntity(entity)
@@ -169,9 +203,8 @@ func (s *GameServer) handleConnectRequest(req *proto.Request, srv proto.Game_Str
 			entities = append(entities, protoEntity)
 		}
 	}
+	s.game.Mu.RUnlock()
 
-	// @todo handle cases where connection is too fast
-	time.Sleep(time.Second * 1)
 	// Send the client an initialize message.
 	resp := proto.Response{
 		Action: &proto.Response_Initialize{
@@ -181,7 +214,8 @@ func (s *GameServer) handleConnectRequest(req *proto.Request, srv proto.Game_Str
 		},
 	}
 	if err := srv.Send(&resp); err != nil {
-		log.Printf("send error %v", err)
+		s.removePlayer(playerID)
+		return playerID, err
 	}
 	log.Printf("sent initialize message for %s", connect.Name)
 
@@ -195,35 +229,26 @@ func (s *GameServer) handleConnectRequest(req *proto.Request, srv proto.Game_Str
 	}
 	s.broadcast(&resp)
 
-	// Add the new client.
-	s.mu.Lock()
-	s.clients[player.ID()] = &client{
-		StreamServer: srv,
-	}
-	s.mu.Unlock()
-
-	// Return the new player ID.
-	return player.ID()
+	return playerID, nil
 }
 
 // handleMoveRequest makes a request to the game engine to move a player.
-func (s *GameServer) handleMoveRequest(playerID uuid.UUID, req *proto.Request, srv proto.Game_StreamServer) {
+func (s *GameServer) handleMoveRequest(req *proto.Request, currentClient *client) {
 	move := req.GetMove()
 	s.game.ActionChannel <- backend.MoveAction{
-		ID:        playerID,
+		ID:        currentClient.ID,
 		Direction: proto.GetBackendDirection(move.Direction),
 	}
 }
 
-func (s *GameServer) handleLaserRequest(playerID uuid.UUID, req *proto.Request, srv proto.Game_StreamServer) {
+func (s *GameServer) handleLaserRequest(req *proto.Request, currentClient *client) {
 	laser := req.GetLaser()
 	id, err := uuid.Parse(laser.Id)
 	if err != nil {
-		// @todo handle
-		return
+		log.Printf("invalid laser ID provided by %s: %s", currentClient.ID.String(), laser.Id)
 	}
 	s.game.ActionChannel <- backend.LaserAction{
-		OwnerID:   playerID,
+		OwnerID:   currentClient.ID,
 		ID:        id,
 		Direction: proto.GetBackendDirection(laser.Direction),
 	}
@@ -279,7 +304,7 @@ func (s *GameServer) handleRoundOverChange(change backend.RoundOverChange) {
 	defer s.game.Mu.RUnlock()
 	timestamp, err := ptypes.TimestampProto(s.game.NewRoundAt)
 	if err != nil {
-		return
+		log.Fatalf("unable to parse new round timestamp %v", s.game.NewRoundAt)
 	}
 	resp := proto.Response{
 		Action: &proto.Response_RoundOver{

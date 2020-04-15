@@ -41,7 +41,7 @@ func connectApp(info *connectInfo) *tview.Application {
 		SetTitle("Connect to tshooter server").
 		SetBackgroundColor(backgroundColor)
 	errors := tview.NewTextView().
-		SetText(" Use the tab key to change fields, and enter to press a button")
+		SetText(" Use the tab key to change fields, and enter to submit")
 	errors.SetBackgroundColor(backgroundColor)
 	form := tview.NewForm()
 	form.AddInputField("Player name", "", 16, nil, nil).
