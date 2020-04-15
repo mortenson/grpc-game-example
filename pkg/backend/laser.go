@@ -46,7 +46,7 @@ func (action LaserAction) Perform(game *Game) {
 		return
 	}
 	actionKey := fmt.Sprintf("%T:%s", action, entity.ID().String())
-	if !game.checkLastActionTime(actionKey, 500) {
+	if !game.checkLastActionTime(actionKey, laserThrottle) {
 		return
 	}
 	laser := Laser{

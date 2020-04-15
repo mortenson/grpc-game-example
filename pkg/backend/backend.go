@@ -9,6 +9,14 @@ import (
 	"github.com/google/uuid"
 )
 
+const (
+	roundOverScore          = 10
+	newRoundWaitTime        = 10 * time.Second
+	collisionCheckFrequency = 20 * time.Millisecond
+	moveThrottle            = 50 * time.Millisecond
+	laserThrottle           = 500 * time.Millisecond
+)
+
 // Game is the backend engine for the game. It can be used regardless of how
 // game data is rendered, or if a game server is being used.
 type Game struct {
@@ -127,8 +135,8 @@ func (game *Game) watchCollisions() {
 					}
 					game.sendChange(change)
 					game.AddScore(laserOwnerID)
-					if game.Score[laserOwnerID] >= 10 {
-						game.queueNewRound(laserOwnerID, time.Now().Add(time.Second*10))
+					if game.Score[laserOwnerID] >= roundOverScore {
+						game.queueNewRound(laserOwnerID)
 					}
 				case *Laser:
 					change := RemoveEntityChange{
@@ -158,7 +166,7 @@ func (game *Game) watchCollisions() {
 			}
 		}
 		game.Mu.Unlock()
-		time.Sleep(time.Millisecond * 20)
+		time.Sleep(collisionCheckFrequency)
 	}
 }
 
@@ -194,13 +202,13 @@ func (game *Game) startNewRound() {
 	game.sendChange(RoundStartChange{})
 }
 
-func (game *Game) queueNewRound(roundWinner uuid.UUID, newRoundAt time.Time) {
+func (game *Game) queueNewRound(roundWinner uuid.UUID) {
 	game.WaitForRound = true
-	game.NewRoundAt = newRoundAt
+	game.NewRoundAt = time.Now().Add(newRoundWaitTime)
 	game.RoundWinner = roundWinner
 	game.sendChange(RoundOverChange{})
 	go func() {
-		time.Sleep(time.Second * 10)
+		time.Sleep(newRoundWaitTime)
 		game.Mu.Lock()
 		game.startNewRound()
 		game.Mu.Unlock()
@@ -211,9 +219,9 @@ func (game *Game) AddScore(id uuid.UUID) {
 	game.Score[id]++
 }
 
-func (game *Game) checkLastActionTime(actionKey string, throttle int) bool {
+func (game *Game) checkLastActionTime(actionKey string, throttle time.Duration) bool {
 	lastAction, ok := game.lastAction[actionKey]
-	if ok && lastAction.After(time.Now().Add(-1*time.Duration(throttle)*time.Millisecond)) {
+	if ok && lastAction.After(time.Now().Add(-1*throttle)) {
 		return false
 	}
 	return true
@@ -335,7 +343,7 @@ func (action MoveAction) Perform(game *Game) {
 		return
 	}
 	actionKey := fmt.Sprintf("%T:%s", action, entity.ID().String())
-	if !game.checkLastActionTime(actionKey, 50) {
+	if !game.checkLastActionTime(actionKey, moveThrottle) {
 		return
 	}
 	position := positioner.Position()

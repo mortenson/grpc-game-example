@@ -13,7 +13,14 @@ import (
 	"github.com/rivo/tview"
 )
 
-const backgroundColor = tcell.Color234
+const (
+	backgroundColor = tcell.Color234
+	textColor       = tcell.ColorWhite
+	playerColor     = tcell.ColorWhite
+	wallColor       = tcell.Color24
+	laserColor      = tcell.ColorRed
+	drawFrequency   = 17 * time.Millisecond
+)
 
 // View renders the game and handles user interaction.
 type View struct {
@@ -183,10 +190,10 @@ func setupViewPort(view *View) {
 			switch entity.(type) {
 			case *backend.Player:
 				icon = entity.(*backend.Player).Icon
-				color = tcell.ColorWhite
+				color = playerColor
 			case *backend.Laser:
 				icon = 'x'
-				color = tcell.ColorRed
+				color = laserColor
 			default:
 				continue
 			}
@@ -200,7 +207,7 @@ func setupViewPort(view *View) {
 			if !withinDrawBounds(x, y, width, height) {
 				continue
 			}
-			screen.SetContent(x, y, '█', nil, style.Foreground(tcell.Color24))
+			screen.SetContent(x, y, '█', nil, style.Foreground(wallColor))
 		}
 		return 0, 0, 0, 0
 	})
@@ -251,7 +258,7 @@ func setupViewPort(view *View) {
 	helpText := tview.NewTextView().
 		SetTextAlign(tview.AlignCenter).
 		SetText("← → ↑ ↓ move - wasd shoot - p players - esc close - ctrl+q quit").
-		SetTextColor(tcell.ColorWhite)
+		SetTextColor(textColor)
 	helpText.SetBackgroundColor(backgroundColor)
 	flex := tview.NewFlex().
 		SetDirection(tview.FlexRow).
@@ -301,7 +308,7 @@ func NewView(game *backend.Game) *View {
 
 // Start starts the frontend game loop.
 func (view *View) Start() {
-	drawTicker := time.NewTicker(17 * time.Millisecond)
+	drawTicker := time.NewTicker(drawFrequency)
 	stop := make(chan bool)
 	go func() {
 		for {
