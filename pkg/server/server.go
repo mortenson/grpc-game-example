@@ -64,55 +64,77 @@ func (s *GameServer) Stream(srv proto.Game_StreamServer) error {
 	log.Println("start new server")
 	ctx, cancel := context.WithCancel(srv.Context())
 	var currentClient *client
-	for {
-		select {
-		case <-ctx.Done():
-			log.Printf("stream done with error \"%v\"", ctx.Err())
-			return ctx.Err()
-		default:
-		}
-
-		req, err := srv.Recv()
-		if err != nil {
-			log.Printf("receive error %v", err)
-			if currentClient != nil {
-				s.mu.Lock()
-				s.removeClient(currentClient)
-				s.mu.Unlock()
-				s.removePlayer(currentClient.ID)
+	// Cancel client if they timeout.
+	lastMessage := time.Now()
+	timeoutTicker := time.NewTicker(1 * time.Minute)
+	go func() {
+		for {
+			if currentClient != nil && time.Now().Sub(lastMessage).Minutes() > 15 {
+				log.Printf("%s - user timed out", currentClient.ID)
+				cancel()
+				return
 			}
-			return err
+			<-timeoutTicker.C
 		}
-		log.Printf("got message %+v", req)
-
-		if currentClient == nil && req.GetConnect() != nil {
-			playerID, err := s.handleConnectRequest(req, srv)
+	}()
+	// Wait for stream requests.
+	go func() {
+		for {
+			req, err := srv.Recv()
 			if err != nil {
-				log.Printf("error when connecting %s: %+v", playerID.String(), err)
-				return err
+				log.Printf("receive error %v", err)
+				cancel()
+				return
 			}
-			// Add the new client.
-			s.mu.Lock()
-			currentClient = &client{
-				StreamServer: srv,
-				Cancel:       cancel,
-				ID:           playerID,
+			log.Printf("got message %+v", req)
+
+			if currentClient != nil {
+				lastMessage = time.Now()
 			}
-			s.clients[playerID] = currentClient
-			s.mu.Unlock()
-		}
 
-		if currentClient == nil {
-			continue
-		}
+			if currentClient == nil && req.GetConnect() != nil {
+				playerID, err := s.handleConnectRequest(req, srv)
+				if err != nil {
+					log.Printf("%s - error when connecting %+v", playerID, err)
+					cancel()
+					return
+				}
+				// Add the new client.
+				s.mu.Lock()
+				currentClient = &client{
+					StreamServer: srv,
+					Cancel:       cancel,
+					ID:           playerID,
+				}
+				s.clients[playerID] = currentClient
+				s.mu.Unlock()
+			}
 
-		switch req.GetAction().(type) {
-		case *proto.Request_Move:
-			s.handleMoveRequest(req, currentClient)
-		case *proto.Request_Laser:
-			s.handleLaserRequest(req, currentClient)
+			if currentClient == nil {
+				continue
+			}
+
+			switch req.GetAction().(type) {
+			case *proto.Request_Move:
+				s.handleMoveRequest(req, currentClient)
+			case *proto.Request_Laser:
+				s.handleLaserRequest(req, currentClient)
+			}
 		}
+	}()
+	// Wait for stream to be done.
+	<-ctx.Done()
+	timeoutTicker.Stop()
+	log.Printf(`stream done with error "%v"`, ctx.Err())
+	// Remove client if it was added.
+	if currentClient != nil {
+		log.Printf("%s - removing client", currentClient.ID)
+		s.mu.Lock()
+		s.removeClient(currentClient)
+		s.mu.Unlock()
+		s.removePlayer(currentClient.ID)
 	}
+	return ctx.Err()
 }
 
 // WatchChanges waits for new game engine changes and broadcasts to clients.
@@ -146,20 +168,16 @@ func (s *GameServer) WatchChanges() {
 
 // broadcast sends a response to all clients.
 func (s *GameServer) broadcast(resp *proto.Response) {
-	removals := []uuid.UUID{}
 	s.mu.Lock()
 	for id, currentClient := range s.clients {
 		if err := currentClient.StreamServer.Send(resp); err != nil {
-			log.Printf("broadcast error %v, removing %s", err, id)
-			s.removeClient(currentClient)
-			removals = append(removals, id)
+			log.Printf("%s - broadcast error %v", id, err)
+			currentClient.Cancel()
+			continue
 		}
-		log.Printf("broadcasted %+v message to %s", resp, id)
+		log.Printf("%s - broadcasted %+v", resp, id)
 	}
 	s.mu.Unlock()
-	for _, id := range removals {
-		s.removePlayer(id)
-	}
 }
 
 // handleConnectRequest processes new players.
@@ -217,7 +235,7 @@ func (s *GameServer) handleConnectRequest(req *proto.Request, srv proto.Game_Str
 		s.removePlayer(playerID)
 		return playerID, err
 	}
-	log.Printf("sent initialize message for %s", connect.Name)
+	log.Printf("%s - sent initialize message", connect.Id)
 
 	// Inform all other clients of the new player.
 	resp = proto.Response{
@@ -245,7 +263,7 @@ func (s *GameServer) handleLaserRequest(req *proto.Request, currentClient *clien
 	laser := req.GetLaser()
 	id, err := uuid.Parse(laser.Id)
 	if err != nil {
-		log.Printf("invalid laser ID provided by %s: %s", currentClient.ID.String(), laser.Id)
+		log.Printf(`%s - invalid laser ID "%s"`, currentClient.ID, laser.Id)
 	}
 	s.game.ActionChannel <- backend.LaserAction{
 		OwnerID:   currentClient.ID,
