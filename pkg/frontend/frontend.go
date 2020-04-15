@@ -302,6 +302,7 @@ func NewView(game *backend.Game) *View {
 // Start starts the frontend game loop.
 func (view *View) Start() {
 	drawTicker := time.NewTicker(17 * time.Millisecond)
+	stop := make(chan bool)
 	go func() {
 		for {
 			for _, callback := range view.drawCallbacks {
@@ -309,10 +310,16 @@ func (view *View) Start() {
 			}
 			view.App.Draw()
 			<-drawTicker.C
+			select {
+			case <-stop:
+				return
+			default:
+			}
 		}
 	}()
 	go func() {
 		err := view.App.Run()
+		stop <- true
 		drawTicker.Stop()
 		select {
 		case view.Done <- err:
