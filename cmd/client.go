@@ -4,6 +4,7 @@ import (
 	"context"
 	"log"
 	"math/rand"
+	"regexp"
 	"time"
 
 	"github.com/gdamore/tcell"
@@ -44,7 +45,14 @@ func connectApp(info *connectInfo) *tview.Application {
 		SetText(" Use the tab key to change fields, and enter to submit")
 	errors.SetBackgroundColor(backgroundColor)
 	form := tview.NewForm()
-	form.AddInputField("Player name", "", 16, nil, nil).
+	re := regexp.MustCompile("^[a-zA-Z0-9]+$")
+	form.AddInputField("Player name", "", 16, func(textCheck string, lastChar rune) bool {
+		result := re.MatchString(textCheck)
+		if !result {
+			errors.SetText(" Only alphanumeric characters are allowed")
+		}
+		return result
+	}, nil).
 		AddInputField("Server address", ":8888", 32, nil, nil).
 		AddButton("Connect", func() {
 			info.PlayerName = form.GetFormItem(0).(*tview.InputField).GetText()
