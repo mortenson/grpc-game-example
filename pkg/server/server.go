@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"log"
+	"math/rand"
 	"regexp"
 	"strings"
 	"sync"
@@ -186,9 +187,8 @@ func (s *GameServer) broadcast(resp *proto.Response) {
 
 // handleConnectRequest processes new players.
 func (s *GameServer) handleConnectRequest(req *proto.Request, srv proto.Game_StreamServer) (uuid.UUID, error) {
-	// When testing locally the connection was too fast, so sometimes
-	// connecting would fail. @todo investigate a better fix.
-	time.Sleep(time.Second * 1)
+	// When debugging failed connections adding a sleep has worked in the past.
+	//time.Sleep(time.Second * 1)
 
 	connect := req.GetConnect()
 
@@ -202,8 +202,11 @@ func (s *GameServer) handleConnectRequest(req *proto.Request, srv proto.Game_Str
 	}
 	icon, _ := utf8.DecodeRuneInString(strings.ToUpper(connect.Name))
 
-	// @todo Choose a start position away from other players?
-	startCoordinate := backend.Coordinate{X: 0, Y: 0}
+	// Choose a random spawn point.
+	spawnPoints := s.game.GetMapSpawnPoints()
+	rand.Seed(time.Now().Unix())
+	i := rand.Int() % len(spawnPoints)
+	startCoordinate := spawnPoints[i]
 
 	// Add the player.
 	player := &backend.Player{

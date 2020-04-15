@@ -88,7 +88,7 @@ func (game *Game) watchCollisions() {
 				continue
 			}
 			// Get the first laser, if present.
-			// @todo Make this generic is there are more "this kills you"
+			// @todo Make this generic if there are more "this kills you"
 			// entity types.
 			hasLaser := false
 			var laserOwnerID uuid.UUID
@@ -117,11 +117,11 @@ func (game *Game) watchCollisions() {
 					if player.ID() == laserOwnerID {
 						continue
 					}
-					spawnPoints := game.GetMapSpawnPoints()
 					// Choose a spawn point furthest away from where the
 					// player died.
+					spawnPoints := game.GetMapSpawnPoints()
 					spawnPoint := spawnPoints[0]
-					for _, sp := range game.GetMapSpawnPoints() {
+					for _, sp := range spawnPoints {
 						if distance(player.Position(), sp) > distance(player.Position(), spawnPoint) {
 							spawnPoint = sp
 						}

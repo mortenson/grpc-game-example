@@ -112,8 +112,11 @@ func (c *GameClient) handleMoveChange(change backend.MoveChange) {
 	c.Stream.Send(&req)
 }
 
-// @todo Is this the right way to respond to changes?
 func (c *GameClient) handleAddEntityChange(change backend.AddEntityChange) {
+	// Note: while abstracting changes like this can be nice, it's odd that we
+	// assume that all add entity changes come as a result of the player
+	// creating the entity. Maybe more granular changes or the concept of an
+	// owner makes sense here.
 	switch change.Entity.(type) {
 	case *backend.Laser:
 		laser := change.Entity.(*backend.Laser)
