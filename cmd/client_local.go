@@ -1,6 +1,8 @@
 package main
 
 import (
+	"log"
+
 	"github.com/google/uuid"
 	"github.com/mortenson/grpc-game-example/pkg/backend"
 	"github.com/mortenson/grpc-game-example/pkg/frontend"
@@ -26,4 +28,8 @@ func main() {
 
 	game.Start()
 	view.Start()
+	err := <-view.Done
+	if err != nil {
+		log.Fatal(err)
+	}
 }

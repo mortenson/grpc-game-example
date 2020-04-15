@@ -86,27 +86,25 @@ func main() {
 	grpcClient := proto.NewGameClient(conn)
 	stream, err := grpcClient.Stream(context.Background())
 	if err != nil {
-		panic(err)
-	}
-	ctx := stream.Context()
-
-	go func() {
-		<-ctx.Done()
-		if err := ctx.Err(); err != nil {
-			log.Println(err)
-		}
-		view.App.Stop()
-	}()
-
-	if err != nil {
-		log.Fatalf("openn stream error %v", err)
+		log.Fatalf("open stream error %v", err)
 	}
 
-	client := client.NewGameClient(stream, game, view)
+	ctx, cancel := context.WithCancel(stream.Context())
+	client := client.NewGameClient(stream, cancel, game, view)
 	client.Start()
 
 	playerID := uuid.New()
 	client.Connect(playerID, info.PlayerName)
 
 	view.Start()
+
+	select {
+	case <-ctx.Done():
+		view.App.Stop()
+		if err := ctx.Err(); err != nil {
+			log.Println(err)
+		}
+	case <-view.Quit:
+		return
+	}
 }

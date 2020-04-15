@@ -24,6 +24,8 @@ type View struct {
 	pages         *tview.Pages
 	drawCallbacks []func()
 	viewPort      tview.Primitive
+	Done          chan error
+	Quit          chan bool
 }
 
 func centeredModal(p tview.Primitive) tview.Primitive {
@@ -269,6 +271,8 @@ func NewView(game *backend.Game) *View {
 		Paused:        false,
 		pages:         pages,
 		drawCallbacks: make([]func(), 0),
+		Done:          make(chan error),
+		Quit:          make(chan bool),
 	}
 	setupViewPort(view)
 	setupScoreModal(view)
@@ -283,6 +287,10 @@ func NewView(game *backend.Game) *View {
 			app.SetFocus(view.viewPort)
 		case tcell.KeyCtrlQ:
 			app.Stop()
+			select {
+			case view.Quit <- true:
+			default:
+			}
 		}
 
 		return e
@@ -292,15 +300,23 @@ func NewView(game *backend.Game) *View {
 }
 
 // Start starts the frontend game loop.
-func (view *View) Start() error {
+func (view *View) Start() {
+	drawTicker := time.NewTicker(17 * time.Millisecond)
 	go func() {
 		for {
 			for _, callback := range view.drawCallbacks {
 				view.App.QueueUpdate(callback)
 			}
 			view.App.Draw()
-			time.Sleep(17 * time.Millisecond)
+			<-drawTicker.C
 		}
 	}()
-	return view.App.Run()
+	go func() {
+		err := view.App.Run()
+		drawTicker.Stop()
+		select {
+		case view.Done <- err:
+		default:
+		}
+	}()
 }
