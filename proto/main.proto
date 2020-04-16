@@ -50,6 +50,7 @@ message Entity {
 message Connect {
     string id = 1;
     string name = 2;
+    string password = 3;
 }
 
 message Initialize {

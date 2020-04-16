@@ -32,7 +32,6 @@ type View struct {
 	drawCallbacks []func()
 	viewPort      tview.Primitive
 	Done          chan error
-	Quit          chan bool
 }
 
 func centeredModal(p tview.Primitive) tview.Primitive {
@@ -281,7 +280,6 @@ func NewView(game *backend.Game) *View {
 		pages:         pages,
 		drawCallbacks: make([]func(), 0),
 		Done:          make(chan error),
-		Quit:          make(chan bool),
 	}
 	setupViewPort(view)
 	setupScoreModal(view)
@@ -295,9 +293,11 @@ func NewView(game *backend.Game) *View {
 			pages.HidePage("score")
 			app.SetFocus(view.viewPort)
 		case tcell.KeyCtrlQ:
+			fallthrough
+		case tcell.KeyCtrlC:
 			app.Stop()
 			select {
-			case view.Quit <- true:
+			case view.Done <- nil:
 			default:
 			}
 		}

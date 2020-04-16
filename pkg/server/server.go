@@ -33,14 +33,19 @@ type client struct {
 // GameServer is used to stream game information with clients.
 type GameServer struct {
 	proto.UnimplementedGameServer
-	game    *backend.Game
-	clients map[uuid.UUID]*client
-	mu      sync.RWMutex
+	game     *backend.Game
+	clients  map[uuid.UUID]*client
+	mu       sync.RWMutex
+	password string
 }
 
 // NewGameServer constructs a new game server struct.
-func NewGameServer(game *backend.Game) *GameServer {
-	server := &GameServer{game: game, clients: make(map[uuid.UUID]*client)}
+func NewGameServer(game *backend.Game, password string) *GameServer {
+	server := &GameServer{
+		game:     game,
+		clients:  make(map[uuid.UUID]*client),
+		password: password,
+	}
 	server.WatchChanges()
 	return server
 }
@@ -75,11 +80,16 @@ func (s *GameServer) Stream(srv proto.Game_StreamServer) error {
 	var currentClient *client
 	// Cancel client if they timeout.
 	lastMessage := time.Now()
+	streamStartTime := time.Now()
 	timeoutTicker := time.NewTicker(1 * time.Minute)
 	go func() {
 		for {
 			if currentClient != nil && time.Now().Sub(lastMessage).Minutes() > clientTimeout {
 				log.Printf("%s - user timed out", currentClient.ID)
+				cancel()
+				return
+			} else if currentClient == nil && time.Now().Sub(streamStartTime).Seconds() > 30 {
+				log.Printf("%s - user did not connect last enough", currentClient.ID)
 				cancel()
 				return
 			}
@@ -195,11 +205,16 @@ func (s *GameServer) handleConnectRequest(req *proto.Request, srv proto.Game_Str
 	//time.Sleep(time.Second * 1)
 
 	connect := req.GetConnect()
-
 	playerID, err := uuid.Parse(connect.Id)
 	if err != nil {
 		return playerID, err
 	}
+
+	// Exit as early as possible if password is wrong.
+	if connect.Password != s.password {
+		return playerID, errors.New("invalid password provided")
+	}
+
 	re := regexp.MustCompile("^[a-zA-Z0-9]+$")
 	if !re.MatchString(connect.Name) {
 		return playerID, errors.New("invalid name provided")

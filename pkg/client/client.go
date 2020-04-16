@@ -39,14 +39,15 @@ func NewGameClient(stream proto.Game_StreamClient, cancel context.CancelFunc, ga
 }
 
 // Connect connects a new player to the server.
-func (c *GameClient) Connect(playerID uuid.UUID, playerName string) {
+func (c *GameClient) Connect(playerID uuid.UUID, playerName string, password string) {
 	c.View.Paused = true
 	c.CurrentPlayer = playerID
 	req := proto.Request{
 		Action: &proto.Request_Connect{
 			Connect: &proto.Connect{
-				Id:   playerID.String(),
-				Name: playerName,
+				Id:       playerID.String(),
+				Name:     playerName,
+				Password: password,
 			},
 		},
 	}

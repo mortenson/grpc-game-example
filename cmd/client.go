@@ -24,6 +24,7 @@ const (
 type connectInfo struct {
 	PlayerName string
 	Address    string
+	Password   string
 }
 
 func connectApp(info *connectInfo) *tview.Application {
@@ -46,9 +47,11 @@ func connectApp(info *connectInfo) *tview.Application {
 		return result
 	}, nil).
 		AddInputField("Server address", ":8888", 32, nil, nil).
+		AddPasswordField("Server password", "", 32, '*', nil).
 		AddButton("Connect", func() {
 			info.PlayerName = form.GetFormItem(0).(*tview.InputField).GetText()
 			info.Address = form.GetFormItem(1).(*tview.InputField).GetText()
+			info.Password = form.GetFormItem(2).(*tview.InputField).GetText()
 			if info.PlayerName == "" || info.Address == "" {
 				errors.SetText(" All fields are required.")
 				return
@@ -94,7 +97,7 @@ func main() {
 	client.Start()
 
 	playerID := uuid.New()
-	client.Connect(playerID, info.PlayerName)
+	client.Connect(playerID, info.PlayerName, info.Password)
 
 	view.Start()
 
@@ -104,7 +107,9 @@ func main() {
 		if err := ctx.Err(); err != nil {
 			log.Println(err)
 		}
-	case <-view.Quit:
-		return
+	case err := <-view.Done:
+		if err != nil {
+			log.Fatal(err)
+		}
 	}
 }
