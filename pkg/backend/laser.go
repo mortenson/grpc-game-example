@@ -52,7 +52,7 @@ func (action LaserAction) Perform(game *Game) {
 	}
 	laser := Laser{
 		InitialPosition: entity.(Positioner).Position(),
-		StartTime:       time.Now(),
+		StartTime:       action.Created,
 		Direction:       action.Direction,
 		IdentifierBase:  IdentifierBase{action.ID},
 		OwnerID:         action.OwnerID,
