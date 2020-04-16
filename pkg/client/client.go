@@ -12,23 +12,29 @@ import (
 	"github.com/mortenson/grpc-game-example/proto"
 )
 
+const (
+	positionHistoryLimit = 5
+)
+
 // GameClient is used to stream game information to a server and update the
 // game state as needed.
 type GameClient struct {
-	CurrentPlayer uuid.UUID
-	Stream        proto.Game_StreamClient
-	Game          *backend.Game
-	View          *frontend.View
-	Cancel        context.CancelFunc
+	CurrentPlayer   uuid.UUID
+	Stream          proto.Game_StreamClient
+	Game            *backend.Game
+	View            *frontend.View
+	Cancel          context.CancelFunc
+	positionHistory []backend.Coordinate
 }
 
 // NewGameClient constructs a new game client struct.
 func NewGameClient(stream proto.Game_StreamClient, cancel context.CancelFunc, game *backend.Game, view *frontend.View) *GameClient {
 	return &GameClient{
-		Stream: stream,
-		Game:   game,
-		View:   view,
-		Cancel: cancel,
+		Stream:          stream,
+		Game:            game,
+		View:            view,
+		Cancel:          cancel,
+		positionHistory: make([]backend.Coordinate, positionHistoryLimit),
 	}
 }
 
@@ -110,6 +116,8 @@ func (c *GameClient) handleMoveChange(change backend.MoveChange) {
 		},
 	}
 	c.Stream.Send(&req)
+	// Store position history to help with stuttering.
+	c.positionHistory = append([]backend.Coordinate{change.Position}, c.positionHistory[:positionHistoryLimit]...)
 }
 
 func (c *GameClient) handleAddEntityChange(change backend.AddEntityChange) {
@@ -152,6 +160,11 @@ func (c *GameClient) handleAddEntityResponse(resp *proto.Response) {
 		c.Exit(fmt.Sprintf("can not get backend entity from %+v", entity))
 		return
 	}
+	// To prevent jittering, ignore lasers we created.
+	laser, ok := entity.(*backend.Laser)
+	if ok && laser.OwnerID == c.CurrentPlayer {
+		return
+	}
 	c.Game.AddEntity(entity)
 }
 
@@ -161,6 +174,19 @@ func (c *GameClient) handleUpdateEntityResponse(resp *proto.Response) {
 	if entity == nil {
 		c.Exit(fmt.Sprintf("can not get backend entity from %+v", entity))
 		return
+	}
+	// To prevent jittering, ignore updates for recent positions.
+	// Note: This feels OK, but isn't perfect. I think if I refactored the
+	// networking to use more targeted responses, i.e. "move confirmed" sent
+	// after a player moves, you could compare recent moves instead of
+	// positions and do something like rollback networking.
+	player, ok := entity.(*backend.Player)
+	if ok && player.ID() == c.CurrentPlayer {
+		for _, position := range c.positionHistory {
+			if player.Position() == position {
+				return
+			}
+		}
 	}
 	c.Game.UpdateEntity(entity)
 }

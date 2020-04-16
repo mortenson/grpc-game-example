@@ -13,7 +13,7 @@ const (
 	roundOverScore          = 10
 	newRoundWaitTime        = 10 * time.Second
 	collisionCheckFrequency = 20 * time.Millisecond
-	moveThrottle            = 50 * time.Millisecond
+	moveThrottle            = 100 * time.Millisecond
 	laserThrottle           = 500 * time.Millisecond
 )
 
