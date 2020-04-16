@@ -13,7 +13,7 @@ const (
 	roundOverScore          = 10
 	newRoundWaitTime        = 10 * time.Second
 	collisionCheckFrequency = 20 * time.Millisecond
-	moveThrottle            = 100 * time.Millisecond
+	moveThrottle            = 130 * time.Millisecond
 	laserThrottle           = 500 * time.Millisecond
 )
 
@@ -217,16 +217,16 @@ func (game *Game) AddScore(id uuid.UUID) {
 	game.Score[id]++
 }
 
-func (game *Game) checkLastActionTime(actionKey string, throttle time.Duration) bool {
+func (game *Game) checkLastActionTime(actionKey string, created time.Time, throttle time.Duration) bool {
 	lastAction, ok := game.lastAction[actionKey]
-	if ok && lastAction.After(time.Now().Add(-1*throttle)) {
+	if ok && lastAction.After(created.Add(-1*throttle)) {
 		return false
 	}
 	return true
 }
 
-func (game *Game) updateLastActionTime(actionKey string) {
-	game.lastAction[actionKey] = time.Now()
+func (game *Game) updateLastActionTime(actionKey string, created time.Time) {
+	game.lastAction[actionKey] = created
 }
 
 func (game *Game) sendChange(change Change) {
@@ -324,6 +324,7 @@ type Action interface {
 type MoveAction struct {
 	Direction Direction
 	ID        uuid.UUID
+	Created   time.Time
 }
 
 // Perform contains backend logic required to move an entity.
@@ -341,7 +342,7 @@ func (action MoveAction) Perform(game *Game) {
 		return
 	}
 	actionKey := fmt.Sprintf("%T:%s", action, entity.ID().String())
-	if !game.checkLastActionTime(actionKey, moveThrottle) {
+	if !game.checkLastActionTime(actionKey, action.Created, moveThrottle) {
 		return
 	}
 	position := positioner.Position()
@@ -370,5 +371,5 @@ func (action MoveAction) Perform(game *Game) {
 		Position:  position,
 	}
 	game.sendChange(change)
-	game.updateLastActionTime(actionKey)
+	game.updateLastActionTime(actionKey, action.Created)
 }

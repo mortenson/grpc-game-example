@@ -232,6 +232,7 @@ func setupViewPort(view *View) {
 			view.Game.ActionChannel <- backend.MoveAction{
 				ID:        view.CurrentPlayer,
 				Direction: direction,
+				Created:   time.Now(),
 			}
 		}
 		// Lasers
@@ -251,6 +252,7 @@ func setupViewPort(view *View) {
 				OwnerID:   view.CurrentPlayer,
 				ID:        uuid.New(),
 				Direction: laserDirection,
+				Created:   time.Now(),
 			}
 		}
 		return e
