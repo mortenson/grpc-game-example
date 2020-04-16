@@ -62,14 +62,14 @@ func GetBackendEntity(protoEntity *Entity) backend.Identifier {
 		protoLaser := protoEntity.Entity.(*Entity_Laser).Laser
 		return GetBackendLaser(protoLaser)
 	}
-	log.Fatalf("Cannot get backend entity for %T -> %+v", protoEntity, protoEntity)
+	log.Printf("cannot get backend entity for %T -> %+v", protoEntity, protoEntity)
 	return nil
 }
 
 func GetBackendPlayer(protoPlayer *Player) *backend.Player {
 	entityID, err := uuid.Parse(protoPlayer.Id)
 	if err != nil {
-		// @todo handle
+		log.Printf("failed to convert proto UUID: %+v", err)
 		return nil
 	}
 	icon, _ := utf8.DecodeRuneInString(protoPlayer.Icon)
@@ -85,17 +85,17 @@ func GetBackendPlayer(protoPlayer *Player) *backend.Player {
 func GetBackendLaser(protoLaser *Laser) *backend.Laser {
 	entityID, err := uuid.Parse(protoLaser.Id)
 	if err != nil {
-		// @todo handle
+		log.Printf("failed to convert proto UUID: %+v", err)
 		return nil
 	}
 	ownerID, err := uuid.Parse(protoLaser.OwnerId)
 	if err != nil {
-		// @todo handle
+		log.Printf("failed to convert proto UUID: %+v", err)
 		return nil
 	}
 	timestamp, err := ptypes.Timestamp(protoLaser.StartTime)
 	if err != nil {
-		// @todo handle
+		log.Printf("failed to convert proto timestamp to time: %+v", err)
 		return nil
 	}
 	laser := &backend.Laser{
@@ -123,7 +123,7 @@ func GetProtoEntity(entity backend.Identifier) *Entity {
 		}
 		return &Entity{Entity: &protoLaser}
 	}
-	log.Fatalf("Cannot get proto entity for %T -> %+v", entity, entity)
+	log.Printf("cannot get proto entity for %T -> %+v", entity, entity)
 	return nil
 }
 
@@ -139,7 +139,7 @@ func GetProtoPlayer(player *backend.Player) *Player {
 func GetProtoLaser(laser *backend.Laser) *Laser {
 	timestamp, err := ptypes.TimestampProto(laser.StartTime)
 	if err != nil {
-		// @todo handle
+		log.Printf("failed to convert time to proto timestamp: %+v", err)
 		return nil
 	}
 	return &Laser{

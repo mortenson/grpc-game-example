@@ -88,8 +88,6 @@ func (game *Game) watchCollisions() {
 				continue
 			}
 			// Get the first laser, if present.
-			// @todo Make this generic if there are more "this kills you"
-			// entity types.
 			hasLaser := false
 			var laserOwnerID uuid.UUID
 			for _, entity := range entities {
