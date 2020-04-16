@@ -19,7 +19,8 @@ import (
 )
 
 const (
-	ClientTimeout = 15
+	clientTimeout = 15
+	maxClients    = 8
 )
 
 // client contains information about connected clients.
@@ -66,6 +67,9 @@ func (s *GameServer) removePlayer(playerID uuid.UUID) {
 
 // Stream is the main loop for dealing with individual players.
 func (s *GameServer) Stream(srv proto.Game_StreamServer) error {
+	if len(s.clients) >= maxClients {
+		return errors.New("The server is full")
+	}
 	log.Println("start new server")
 	ctx, cancel := context.WithCancel(srv.Context())
 	var currentClient *client
@@ -74,7 +78,7 @@ func (s *GameServer) Stream(srv proto.Game_StreamServer) error {
 	timeoutTicker := time.NewTicker(1 * time.Minute)
 	go func() {
 		for {
-			if currentClient != nil && time.Now().Sub(lastMessage).Minutes() > ClientTimeout {
+			if currentClient != nil && time.Now().Sub(lastMessage).Minutes() > clientTimeout {
 				log.Printf("%s - user timed out", currentClient.ID)
 				cancel()
 				return
