@@ -58,7 +58,7 @@ func (c *GameClient) Connect(grpcClient proto.GameClient, playerID uuid.UUID, pl
 		c.Game.AddEntity(backendEntity)
 	}
 
-	// Initialize stream.
+	// Initialize stream with token.
 	header := metadata.New(map[string]string{"authorization": resp.Token})
 	ctx := metadata.NewOutgoingContext(context.Background(), header)
 	stream, err := grpcClient.Stream(ctx)
