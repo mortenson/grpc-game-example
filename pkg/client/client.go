@@ -10,6 +10,7 @@ import (
 	"github.com/mortenson/grpc-game-example/pkg/backend"
 	"github.com/mortenson/grpc-game-example/pkg/frontend"
 	"github.com/mortenson/grpc-game-example/proto"
+	"google.golang.org/grpc/metadata"
 )
 
 const (
@@ -23,41 +24,57 @@ type GameClient struct {
 	Stream          proto.Game_StreamClient
 	Game            *backend.Game
 	View            *frontend.View
-	Cancel          context.CancelFunc
 	positionHistory []backend.Coordinate
 }
 
 // NewGameClient constructs a new game client struct.
-func NewGameClient(stream proto.Game_StreamClient, cancel context.CancelFunc, game *backend.Game, view *frontend.View) *GameClient {
+func NewGameClient(game *backend.Game, view *frontend.View) *GameClient {
 	return &GameClient{
-		Stream:          stream,
 		Game:            game,
 		View:            view,
-		Cancel:          cancel,
 		positionHistory: make([]backend.Coordinate, positionHistoryLimit),
 	}
 }
 
 // Connect connects a new player to the server.
-func (c *GameClient) Connect(playerID uuid.UUID, playerName string, password string) {
-	c.View.Paused = true
-	c.CurrentPlayer = playerID
-	req := proto.Request{
-		Action: &proto.Request_Connect{
-			Connect: &proto.Connect{
-				Id:       playerID.String(),
-				Name:     playerName,
-				Password: password,
-			},
-		},
+func (c *GameClient) Connect(grpcClient proto.GameClient, playerID uuid.UUID, playerName string, password string) error {
+	// Connect to server.
+	req := proto.ConnectRequest{
+		Id:       playerID.String(),
+		Name:     playerName,
+		Password: password,
 	}
-	c.Stream.Send(&req)
+	resp, err := grpcClient.Connect(context.Background(), &req)
+	if err != nil {
+		return err
+	}
+
+	// Add initial entity state.
+	for _, entity := range resp.Entities {
+		backendEntity := proto.GetBackendEntity(entity)
+		if backendEntity == nil {
+			return fmt.Errorf("can not get backend entity from %+v", entity)
+		}
+		c.Game.AddEntity(backendEntity)
+	}
+
+	// Initialize stream.
+	header := metadata.New(map[string]string{"authorization": resp.Token})
+	ctx := metadata.NewOutgoingContext(context.Background(), header)
+	stream, err := grpcClient.Stream(ctx)
+	if err != nil {
+		return err
+	}
+
+	c.CurrentPlayer = playerID
+	c.Stream = stream
+
+	return nil
 }
 
 func (c *GameClient) Exit(message string) {
 	c.View.App.Stop()
 	log.Println(message)
-	c.Cancel()
 }
 
 // Start begins the goroutines needed to recieve server changes and send game
@@ -88,8 +105,6 @@ func (c *GameClient) Start() {
 
 			c.Game.Mu.Lock()
 			switch resp.GetAction().(type) {
-			case *proto.Response_Initialize:
-				c.handleInitializeResponse(resp)
 			case *proto.Response_AddEntity:
 				c.handleAddEntityResponse(resp)
 			case *proto.Response_UpdateEntity:
@@ -136,22 +151,6 @@ func (c *GameClient) handleAddEntityChange(change backend.AddEntityChange) {
 		}
 		c.Stream.Send(&req)
 	}
-}
-
-// HandleInitializeResponse initializes the local player with information
-// provided by the server.
-func (c *GameClient) handleInitializeResponse(resp *proto.Response) {
-	init := resp.GetInitialize()
-	for _, entity := range init.Entities {
-		backendEntity := proto.GetBackendEntity(entity)
-		if backendEntity == nil {
-			c.Exit(fmt.Sprintf("can not get backend entity from %+v", entity))
-			return
-		}
-		c.Game.AddEntity(backendEntity)
-	}
-	c.View.CurrentPlayer = c.CurrentPlayer
-	c.View.Paused = false
 }
 
 func (c *GameClient) handleAddEntityResponse(resp *proto.Response) {

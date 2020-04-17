@@ -5,6 +5,7 @@ package proto;
 import "google/protobuf/timestamp.proto";
 
 service Game {
+    rpc Connect (ConnectRequest) returns (ConnectResponse) {}
     rpc Stream (stream Request) returns (stream Response) {}
 }
 
@@ -47,14 +48,15 @@ message Entity {
     }
 }
 
-message Connect {
+message ConnectRequest {
     string id = 1;
     string name = 2;
     string password = 3;
 }
 
-message Initialize {
-    repeated Entity entities = 1;
+message ConnectResponse {
+    string token = 1;
+    repeated Entity entities = 2;
 }
 
 message Move {
@@ -91,20 +93,18 @@ message RoundStart {
 
 message Request {
     oneof action {
-        Connect connect = 1;
-        Move move = 2;
-        Laser laser = 3;
+        Move move = 1;
+        Laser laser = 2;
     }
 }
 
 message Response {
     oneof action {
-        Initialize initialize = 1;
-        AddEntity addEntity = 2;
-        UpdateEntity updateEntity = 3;
-        RemoveEntity removeEntity = 4;
-        PlayerRespawn playerRespawn = 5;
-        RoundOver roundOver = 6;
-        RoundStart roundStart = 7;
+        AddEntity addEntity = 1;
+        UpdateEntity updateEntity = 2;
+        RemoveEntity removeEntity = 3;
+        PlayerRespawn playerRespawn = 4;
+        RoundOver roundOver = 5;
+        RoundStart roundStart = 6;
     }
 }

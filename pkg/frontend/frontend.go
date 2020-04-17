@@ -27,7 +27,6 @@ type View struct {
 	Game          *backend.Game
 	App           *tview.Application
 	CurrentPlayer uuid.UUID
-	Paused        bool
 	pages         *tview.Pages
 	drawCallbacks []func()
 	viewPort      tview.Primitive
@@ -212,9 +211,6 @@ func setupViewPort(view *View) {
 	})
 	// Handle player movement input.
 	box.SetInputCapture(func(e *tcell.EventKey) *tcell.EventKey {
-		if view.Paused {
-			return e
-		}
 		// Movement
 		direction := backend.DirectionStop
 		switch e.Key() {
@@ -276,7 +272,6 @@ func NewView(game *backend.Game) *View {
 	view := &View{
 		Game:          game,
 		App:           app,
-		Paused:        false,
 		pages:         pages,
 		drawCallbacks: make([]func(), 0),
 		Done:          make(chan error),

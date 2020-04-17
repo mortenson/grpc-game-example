@@ -1,7 +1,6 @@
 package main
 
 import (
-	"context"
 	"log"
 	"regexp"
 
@@ -87,29 +86,19 @@ func main() {
 	}
 
 	grpcClient := proto.NewGameClient(conn)
-	stream, err := grpcClient.Stream(context.Background())
-	if err != nil {
-		log.Fatalf("open stream error %v", err)
-	}
-
-	ctx, cancel := context.WithCancel(stream.Context())
-	client := client.NewGameClient(stream, cancel, game, view)
-	client.Start()
+	client := client.NewGameClient(game, view)
 
 	playerID := uuid.New()
-	client.Connect(playerID, info.PlayerName, info.Password)
+	err = client.Connect(grpcClient, playerID, info.PlayerName, info.Password)
+	if err != nil {
+		log.Fatalf("connect request failed %v", err)
+	}
+	client.Start()
 
 	view.Start()
 
-	select {
-	case <-ctx.Done():
-		view.App.Stop()
-		if err := ctx.Err(); err != nil {
-			log.Println(err)
-		}
-	case err := <-view.Done:
-		if err != nil {
-			log.Fatal(err)
-		}
+	err = <-view.Done
+	if err != nil {
+		log.Fatal(err)
 	}
 }

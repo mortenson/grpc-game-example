@@ -1,6 +1,7 @@
 package server
 
 import (
+	"context"
 	"errors"
 	"log"
 	"math/rand"
@@ -12,6 +13,7 @@ import (
 
 	"github.com/golang/protobuf/ptypes"
 	"github.com/google/uuid"
+	"google.golang.org/grpc/metadata"
 
 	"github.com/mortenson/grpc-game-example/pkg/backend"
 	"github.com/mortenson/grpc-game-example/proto"
@@ -25,7 +27,9 @@ const (
 // client contains information about connected clients.
 type client struct {
 	streamServer proto.Game_StreamServer
+	lastMessage  time.Time
 	done         chan error
+	playerID     uuid.UUID
 	id           uuid.UUID
 }
 
@@ -45,13 +49,14 @@ func NewGameServer(game *backend.Game, password string) *GameServer {
 		clients:  make(map[uuid.UUID]*client),
 		password: password,
 	}
-	server.WatchChanges()
+	server.watchChanges()
+	server.watchTimeout()
 	return server
 }
 
-func (s *GameServer) removeClient(currentClient *client) {
+func (s *GameServer) removeClient(id uuid.UUID) {
 	s.mu.Lock()
-	delete(s.clients, currentClient.id)
+	delete(s.clients, id)
 	s.mu.Unlock()
 }
 
@@ -72,64 +77,41 @@ func (s *GameServer) removePlayer(playerID uuid.UUID) {
 
 // Stream is the main loop for dealing with individual players.
 func (s *GameServer) Stream(srv proto.Game_StreamServer) error {
-	if len(s.clients) >= maxClients {
-		return errors.New("The server is full")
-	}
-	log.Println("start new server")
 	ctx := srv.Context()
-	done := make(chan error)
-	var currentClient *client
-	// Cancel client if they timeout.
-	lastMessage := time.Now()
-	streamStartTime := time.Now()
-	timeoutTicker := time.NewTicker(1 * time.Minute)
-	go func() {
-		for {
-			if currentClient != nil && time.Now().Sub(lastMessage).Minutes() > clientTimeout {
-				done <- errors.New("you have been timed out")
-				return
-			} else if currentClient == nil && time.Now().Sub(streamStartTime).Seconds() > 30 {
-				done <- errors.New("failed to connect within minimum timeframe")
-				return
-			}
-			<-timeoutTicker.C
-		}
-	}()
+	headers, ok := metadata.FromIncomingContext(ctx)
+
+	// Check authorization and get client instance.
+	tokenRaw := headers["authorization"]
+	if len(tokenRaw) == 0 {
+		return errors.New("no token provided")
+	}
+	token, err := uuid.Parse(tokenRaw[0])
+	if err != nil {
+		return errors.New("cannot parse token")
+	}
+	s.mu.Lock()
+	currentClient, ok := s.clients[token]
+	if !ok {
+		return errors.New("token not recognized")
+	}
+	if currentClient.streamServer != nil {
+		return errors.New("stream already active")
+	}
+	currentClient.streamServer = srv
+	s.mu.Unlock()
+
+	log.Println("start new server")
+
 	// Wait for stream requests.
 	go func() {
 		for {
 			req, err := srv.Recv()
 			if err != nil {
 				log.Printf("receive error %v", err)
-				done <- errors.New("failed to receive request")
+				currentClient.done <- errors.New("failed to receive request")
 				return
 			}
 			log.Printf("got message %+v", req)
-
-			if currentClient != nil {
-				lastMessage = time.Now()
-			}
-
-			if currentClient == nil && req.GetConnect() != nil {
-				playerID, err := s.handleConnectRequest(req, srv)
-				if err != nil {
-					done <- err
-					return
-				}
-				// Add the new client.
-				s.mu.Lock()
-				currentClient = &client{
-					streamServer: srv,
-					id:           playerID,
-					done:         make(chan error),
-				}
-				s.clients[playerID] = currentClient
-				s.mu.Unlock()
-			}
-
-			if currentClient == nil {
-				continue
-			}
 
 			switch req.GetAction().(type) {
 			case *proto.Request_Move:
@@ -139,26 +121,122 @@ func (s *GameServer) Stream(srv proto.Game_StreamServer) error {
 			}
 		}
 	}()
+
 	// Wait for stream to be done.
 	var doneError error
 	select {
 	case <-ctx.Done():
 		doneError = ctx.Err()
-	case doneError = <-done:
+	case doneError = <-currentClient.done:
 	}
-	timeoutTicker.Stop()
 	log.Printf(`stream done with error "%v"`, doneError)
-	// Remove client if it was added.
-	if currentClient != nil {
-		log.Printf("%s - removing client", currentClient.id)
-		s.removeClient(currentClient)
-		s.removePlayer(currentClient.id)
-	}
+
+	log.Printf("%s - removing client", currentClient.id)
+	s.removeClient(currentClient.id)
+	s.removePlayer(currentClient.playerID)
+
 	return doneError
 }
 
+func (s *GameServer) Connect(ctx context.Context, req *proto.ConnectRequest) (*proto.ConnectResponse, error) {
+	if len(s.clients) >= maxClients {
+		return nil, errors.New("The server is full")
+	}
+
+	playerID, err := uuid.Parse(req.Id)
+	if err != nil {
+		return nil, err
+	}
+
+	// Exit as early as possible if password is wrong.
+	if req.Password != s.password {
+		return nil, errors.New("invalid password provided")
+	}
+
+	// Check if player already exists.
+	s.game.Mu.RLock()
+	if s.game.GetEntity(playerID) != nil {
+		return nil, errors.New("duplicate player ID provided")
+	}
+	s.game.Mu.RUnlock()
+
+	re := regexp.MustCompile("^[a-zA-Z0-9]+$")
+	if !re.MatchString(req.Name) {
+		return nil, errors.New("invalid name provided")
+	}
+	icon, _ := utf8.DecodeRuneInString(strings.ToUpper(req.Name))
+
+	// Choose a random spawn point.
+	spawnPoints := s.game.GetMapSpawnPoints()
+	rand.Seed(time.Now().Unix())
+	i := rand.Int() % len(spawnPoints)
+	startCoordinate := spawnPoints[i]
+
+	// Add the player.
+	player := &backend.Player{
+		Name:            req.Name,
+		Icon:            icon,
+		IdentifierBase:  backend.IdentifierBase{UUID: playerID},
+		CurrentPosition: startCoordinate,
+	}
+	s.game.Mu.Lock()
+	s.game.AddEntity(player)
+	s.game.Mu.Unlock()
+
+	// Build a slice of current entities.
+	s.game.Mu.RLock()
+	entities := make([]*proto.Entity, 0)
+	for _, entity := range s.game.Entities {
+		protoEntity := proto.GetProtoEntity(entity)
+		if protoEntity != nil {
+			entities = append(entities, protoEntity)
+		}
+	}
+	s.game.Mu.RUnlock()
+
+	// Inform all other clients of the new player.
+	resp := proto.Response{
+		Action: &proto.Response_AddEntity{
+			AddEntity: &proto.AddEntity{
+				Entity: proto.GetProtoEntity(player),
+			},
+		},
+	}
+	s.broadcast(&resp)
+
+	// Add the new client.
+	s.mu.Lock()
+	token := uuid.New()
+	s.clients[token] = &client{
+		id:       token,
+		playerID: playerID,
+		done:     make(chan error),
+	}
+	s.mu.Unlock()
+
+	return &proto.ConnectResponse{
+		Token:    token.String(),
+		Entities: entities,
+	}, nil
+}
+
+func (s *GameServer) watchTimeout() {
+	timeoutTicker := time.NewTicker(1 * time.Minute)
+	go func() {
+		for {
+			for _, client := range s.clients {
+				if time.Now().Sub(client.lastMessage).Minutes() > clientTimeout {
+					client.done <- errors.New("you have been timed out")
+					return
+				}
+			}
+			<-timeoutTicker.C
+		}
+	}()
+}
+
 // WatchChanges waits for new game engine changes and broadcasts to clients.
-func (s *GameServer) WatchChanges() {
+func (s *GameServer) watchChanges() {
 	go func() {
 		for {
 			change := <-s.game.ChangeChannel
@@ -198,90 +276,6 @@ func (s *GameServer) broadcast(resp *proto.Response) {
 		log.Printf("%s - broadcasted %+v", resp, id)
 	}
 	s.mu.Unlock()
-}
-
-// handleConnectRequest processes new players.
-func (s *GameServer) handleConnectRequest(req *proto.Request, srv proto.Game_StreamServer) (uuid.UUID, error) {
-	// When debugging failed connections adding a sleep has worked in the past.
-	//time.Sleep(time.Second * 1)
-
-	connect := req.GetConnect()
-	playerID, err := uuid.Parse(connect.Id)
-	if err != nil {
-		return playerID, err
-	}
-
-	// Exit as early as possible if password is wrong.
-	if connect.Password != s.password {
-		return playerID, errors.New("invalid password provided")
-	}
-
-	// Check if player already exists.
-	s.game.Mu.RLock()
-	if s.game.GetEntity(playerID) != nil {
-		return playerID, errors.New("duplicate player ID provided")
-	}
-	s.game.Mu.RUnlock()
-
-	re := regexp.MustCompile("^[a-zA-Z0-9]+$")
-	if !re.MatchString(connect.Name) {
-		return playerID, errors.New("invalid name provided")
-	}
-	icon, _ := utf8.DecodeRuneInString(strings.ToUpper(connect.Name))
-
-	// Choose a random spawn point.
-	spawnPoints := s.game.GetMapSpawnPoints()
-	rand.Seed(time.Now().Unix())
-	i := rand.Int() % len(spawnPoints)
-	startCoordinate := spawnPoints[i]
-
-	// Add the player.
-	player := &backend.Player{
-		Name:            connect.Name,
-		Icon:            icon,
-		IdentifierBase:  backend.IdentifierBase{UUID: playerID},
-		CurrentPosition: startCoordinate,
-	}
-	s.game.Mu.Lock()
-	s.game.AddEntity(player)
-	s.game.Mu.Unlock()
-
-	// Build a slice of current entities.
-	s.game.Mu.RLock()
-	entities := make([]*proto.Entity, 0)
-	for _, entity := range s.game.Entities {
-		protoEntity := proto.GetProtoEntity(entity)
-		if protoEntity != nil {
-			entities = append(entities, protoEntity)
-		}
-	}
-	s.game.Mu.RUnlock()
-
-	// Send the client an initialize message.
-	resp := proto.Response{
-		Action: &proto.Response_Initialize{
-			Initialize: &proto.Initialize{
-				Entities: entities,
-			},
-		},
-	}
-	if err := srv.Send(&resp); err != nil {
-		s.removePlayer(playerID)
-		return playerID, err
-	}
-	log.Printf("%s - sent initialize message", connect.Id)
-
-	// Inform all other clients of the new player.
-	resp = proto.Response{
-		Action: &proto.Response_AddEntity{
-			AddEntity: &proto.AddEntity{
-				Entity: proto.GetProtoEntity(player),
-			},
-		},
-	}
-	s.broadcast(&resp)
-
-	return playerID, nil
 }
 
 // handleMoveRequest makes a request to the game engine to move a player.
