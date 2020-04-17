@@ -15,6 +15,7 @@ const (
 	collisionCheckFrequency = 20 * time.Millisecond
 	moveThrottle            = 100 * time.Millisecond
 	laserThrottle           = 500 * time.Millisecond
+	laserSpeed              = 50
 )
 
 // Game is the backend engine for the game. It can be used regardless of how
