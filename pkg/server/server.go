@@ -282,7 +282,7 @@ func (s *GameServer) broadcast(resp *proto.Response) {
 func (s *GameServer) handleMoveRequest(req *proto.Request, currentClient *client) {
 	move := req.GetMove()
 	s.game.ActionChannel <- backend.MoveAction{
-		ID:        currentClient.id,
+		ID:        currentClient.playerID,
 		Direction: proto.GetBackendDirection(move.Direction),
 		Created:   time.Now(),
 	}
@@ -302,7 +302,7 @@ func (s *GameServer) handleLaserRequest(req *proto.Request, currentClient *clien
 	}
 	s.game.Mu.RUnlock()
 	s.game.ActionChannel <- backend.LaserAction{
-		OwnerID:   currentClient.id,
+		OwnerID:   currentClient.playerID,
 		ID:        id,
 		Direction: proto.GetBackendDirection(laser.Direction),
 		Created:   time.Now(),

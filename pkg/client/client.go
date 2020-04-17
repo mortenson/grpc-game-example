@@ -67,6 +67,7 @@ func (c *GameClient) Connect(grpcClient proto.GameClient, playerID uuid.UUID, pl
 	}
 
 	c.CurrentPlayer = playerID
+	c.View.CurrentPlayer = playerID
 	c.Stream = stream
 
 	return nil
