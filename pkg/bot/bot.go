@@ -1,7 +1,6 @@
 package bot
 
 import (
-	"fmt"
 	"time"
 
 	"github.com/beefsack/go-astar"
@@ -70,10 +69,10 @@ func NewBots(game *backend.Game) *Bots {
 	}
 }
 
-func (bots *Bots) AddBot(name string) {
+func (bots *Bots) AddBot(name string) *backend.Player {
 	playerID := uuid.New()
 	player := &backend.Player{
-		Name:            fmt.Sprintf("[bot] %s", name),
+		Name:            name,
 		Icon:            'b',
 		IdentifierBase:  backend.IdentifierBase{playerID},
 		CurrentPosition: backend.Coordinate{X: -1, Y: 9},
@@ -82,6 +81,7 @@ func (bots *Bots) AddBot(name string) {
 	bots.game.AddEntity(player)
 	bots.game.Mu.Unlock()
 	bots.bots = append(bots.bots, &bot{playerID: playerID})
+	return player
 }
 
 func getShootDirection(world *world, c1 backend.Coordinate, c2 backend.Coordinate) backend.Direction {
