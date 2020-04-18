@@ -1,6 +1,8 @@
 package main
 
 import (
+	"flag"
+	"fmt"
 	"log"
 
 	"github.com/google/uuid"
@@ -10,6 +12,9 @@ import (
 )
 
 func main() {
+	numBots := flag.Int("bots", 1, "The number of bots to play against.")
+	flag.Parse()
+
 	currentPlayer := backend.Player{
 		Name:            "Alice",
 		Icon:            'A',
@@ -18,17 +23,14 @@ func main() {
 	}
 	game := backend.NewGame()
 	game.AddEntity(&currentPlayer)
-	// game.AddEntity(&backend.Player{
-	// 	Name:            "Bob",
-	// 	Icon:            'B',
-	// 	IdentifierBase:  backend.IdentifierBase{uuid.New()},
-	// 	CurrentPosition: backend.Coordinate{X: 0, Y: 0},
-	// })
-	bots := bot.NewBots(game)
-	bots.AddBot("Dave")
 
 	view := frontend.NewView(game)
 	view.CurrentPlayer = currentPlayer.ID()
+
+	bots := bot.NewBots(game)
+	for i := 0; i < *numBots; i++ {
+		bots.AddBot(fmt.Sprintf("Bob %d", i))
+	}
 
 	game.Start()
 	view.Start()

@@ -12,7 +12,7 @@ import (
 const (
 	roundOverScore          = 10
 	newRoundWaitTime        = 10 * time.Second
-	collisionCheckFrequency = 20 * time.Millisecond
+	collisionCheckFrequency = 10 * time.Millisecond
 	moveThrottle            = 100 * time.Millisecond
 	laserThrottle           = 500 * time.Millisecond
 	laserSpeed              = 50
@@ -369,6 +369,16 @@ func (action MoveAction) Perform(game *Game) {
 	for _, wall := range game.GetMapWalls() {
 		if position == wall {
 			return
+		}
+	}
+	// Check if position collides with a player.
+	collidingEntities, ok := game.getCollisionMap()[position]
+	if ok {
+		for _, entity := range collidingEntities {
+			_, ok := entity.(*Player)
+			if ok {
+				return
+			}
 		}
 	}
 	mover.Move(position)

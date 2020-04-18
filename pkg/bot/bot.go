@@ -1,6 +1,7 @@
 package bot
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/beefsack/go-astar"
@@ -72,7 +73,7 @@ func NewBots(game *backend.Game) *Bots {
 func (bots *Bots) AddBot(name string) {
 	playerID := uuid.New()
 	player := &backend.Player{
-		Name:            name,
+		Name:            fmt.Sprintf("[bot] %s", name),
 		Icon:            'b',
 		IdentifierBase:  backend.IdentifierBase{playerID},
 		CurrentPosition: backend.Coordinate{X: -1, Y: 9},
@@ -156,8 +157,11 @@ func (bots *Bots) Start() {
 					playerPositions[entity.ID()] = player.Position()
 				}
 			}
+			bots.game.Mu.RUnlock()
 			for _, bot := range bots.bots {
+				bots.game.Mu.RLock()
 				player := bots.game.GetEntity(bot.playerID).(*backend.Player)
+				bots.game.Mu.RUnlock()
 				playerPosition := player.Position()
 				// Find the closest position.
 				closestPosition := backend.Coordinate{}
@@ -167,6 +171,15 @@ func (bots *Bots) Start() {
 				for id, position := range playerPositions {
 					if id == player.ID() {
 						continue
+					}
+					// Check if we're on top of the player and move if so.
+					if position == playerPosition {
+						move = true
+						closestPosition = position.Add(backend.Coordinate{
+							X: 1,
+							Y: 1,
+						})
+						break
 					}
 					shootDirection = getShootDirection(world, playerPosition, position)
 					if shootDirection != backend.DirectionStop {
@@ -229,7 +242,6 @@ func (bots *Bots) Start() {
 					Created:   time.Now(),
 				}
 			}
-			bots.game.Mu.RUnlock()
 			time.Sleep(time.Millisecond * 200)
 		}
 		<-bots.done
