@@ -84,6 +84,8 @@ func (game *Game) getCollisionMap() map[Coordinate][]Identifier {
 func (game *Game) watchCollisions() {
 	for {
 		game.Mu.Lock()
+		spawnPointIndex := 0
+		spawnPoints := game.GetMapSpawnPoints()
 		for _, entities := range game.getCollisionMap() {
 			if len(entities) <= 1 {
 				continue
@@ -118,15 +120,10 @@ func (game *Game) watchCollisions() {
 					}
 					// Choose a spawn point furthest away from where the
 					// player died.
-					spawnPoints := game.GetMapSpawnPoints()
-					spawnPoint := spawnPoints[0]
-					for _, sp := range spawnPoints {
-						if Distance(player.Position(), sp) > Distance(player.Position(), spawnPoint) {
-							spawnPoint = sp
-						}
-					}
+					spawnPoint := spawnPoints[spawnPointIndex%len(spawnPoints)]
+					spawnPointIndex++
 					// For debugging.
-					// spawnPoint = Coordinate{X: 0, Y: 0}
+					// spawnPoint := Coordinate{X: 0, Y: 0}
 					player.Move(spawnPoint)
 					change := PlayerRespawnChange{
 						Player:     player,
