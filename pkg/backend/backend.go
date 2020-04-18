@@ -121,7 +121,7 @@ func (game *Game) watchCollisions() {
 					spawnPoints := game.GetMapSpawnPoints()
 					spawnPoint := spawnPoints[0]
 					for _, sp := range spawnPoints {
-						if distance(player.Position(), sp) > distance(player.Position(), spawnPoint) {
+						if Distance(player.Position(), sp) > Distance(player.Position(), spawnPoint) {
 							spawnPoint = sp
 						}
 					}
@@ -243,7 +243,14 @@ type Coordinate struct {
 	Y int
 }
 
-func distance(a Coordinate, b Coordinate) int {
+func (c1 Coordinate) Add(c2 Coordinate) Coordinate {
+	return Coordinate{
+		X: c1.X + c2.X,
+		Y: c1.Y + c2.Y,
+	}
+}
+
+func Distance(a Coordinate, b Coordinate) int {
 	return int(math.Sqrt(math.Pow(float64(b.X-a.X), 2) + math.Pow(float64(b.Y-a.Y), 2)))
 }
 
