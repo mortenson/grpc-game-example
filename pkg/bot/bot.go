@@ -83,6 +83,46 @@ func (bots *Bots) AddBot(name string) {
 	bots.bots = append(bots.bots, &bot{playerID: playerID})
 }
 
+func getShootDirection(world *world, c1 backend.Coordinate, c2 backend.Coordinate) backend.Direction {
+	direction := backend.DirectionStop
+	diffCoordinate := backend.Coordinate{
+		X: 0,
+		Y: 0,
+	}
+	if c1.X == c2.X {
+		if c2.Y < c1.Y {
+			diffCoordinate.Y = -1
+			direction = backend.DirectionUp
+		} else if c2.Y > c1.Y {
+			diffCoordinate.Y = 1
+			direction = backend.DirectionDown
+		}
+	} else if c1.Y == c2.Y {
+		if c2.X < c1.X {
+			diffCoordinate.X = -1
+			direction = backend.DirectionLeft
+		} else if c2.X > c1.X {
+			diffCoordinate.X = 1
+			direction = backend.DirectionRight
+		}
+	}
+	if direction == backend.DirectionStop {
+		return direction
+	}
+	newPosition := c1.Add(diffCoordinate)
+	for {
+		if newPosition == c2 {
+			break
+		}
+		tile, ok := world.tiles[newPosition]
+		if ok && tile.kind == tileWall {
+			return backend.DirectionStop
+		}
+		newPosition = newPosition.Add(diffCoordinate)
+	}
+	return direction
+}
+
 func (bots *Bots) Start() {
 	go func() {
 		world := &world{
@@ -122,16 +162,30 @@ func (bots *Bots) Start() {
 				// Find the closest position.
 				closestPosition := backend.Coordinate{}
 				move := false
-				//shootDirection := backend.DirectionStop
-				//shoot := false
+				shootDirection := backend.DirectionStop
+				shoot := false
 				for id, position := range playerPositions {
 					if id == player.ID() {
 						continue
+					}
+					shootDirection = getShootDirection(world, playerPosition, position)
+					if shootDirection != backend.DirectionStop {
+						shoot = true
+						break
 					}
 					if !move || (backend.Distance(position, playerPosition) < backend.Distance(closestPosition, playerPosition)) {
 						closestPosition = position
 						move = true
 					}
+				}
+				if shoot {
+					bots.game.ActionChannel <- backend.LaserAction{
+						ID:        uuid.New(),
+						OwnerID:   player.ID(),
+						Direction: shootDirection,
+						Created:   time.Now(),
+					}
+					continue
 				}
 				if !move {
 					continue
