@@ -32,6 +32,7 @@ type Game struct {
 	RoundWinner     uuid.UUID
 	WaitForRound    bool
 	IsAuthoritative bool
+	spawnPointIndex int
 }
 
 // NewGame constructs a new Game struct.
@@ -45,6 +46,7 @@ func NewGame() *Game {
 		WaitForRound:    false,
 		Score:           make(map[uuid.UUID]int),
 		gameMap:         MapDefault,
+		spawnPointIndex: 0,
 	}
 	return &game
 }
@@ -56,6 +58,7 @@ func (game *Game) Start() {
 	go game.watchCollisions()
 }
 
+// watchActions
 func (game *Game) watchActions() {
 	for {
 		action := <-game.ActionChannel
@@ -68,23 +71,9 @@ func (game *Game) watchActions() {
 	}
 }
 
-func (game *Game) getCollisionMap() map[Coordinate][]Identifier {
-	collisionMap := map[Coordinate][]Identifier{}
-	for _, entity := range game.Entities {
-		positioner, ok := entity.(Positioner)
-		if !ok {
-			continue
-		}
-		position := positioner.Position()
-		collisionMap[position] = append(collisionMap[position], entity)
-	}
-	return collisionMap
-}
-
 func (game *Game) watchCollisions() {
 	for {
 		game.Mu.Lock()
-		spawnPointIndex := 0
 		spawnPoints := game.GetMapSpawnPoints()
 		for _, entities := range game.getCollisionMap() {
 			if len(entities) <= 1 {
@@ -120,8 +109,8 @@ func (game *Game) watchCollisions() {
 					}
 					// Choose a spawn point furthest away from where the
 					// player died.
-					spawnPoint := spawnPoints[spawnPointIndex%len(spawnPoints)]
-					spawnPointIndex++
+					spawnPoint := spawnPoints[game.spawnPointIndex%len(spawnPoints)]
+					game.spawnPointIndex++
 					// For debugging.
 					// spawnPoint := Coordinate{X: 0, Y: 0}
 					player.Move(spawnPoint)
@@ -164,6 +153,19 @@ func (game *Game) watchCollisions() {
 		game.Mu.Unlock()
 		time.Sleep(collisionCheckFrequency)
 	}
+}
+
+func (game *Game) getCollisionMap() map[Coordinate][]Identifier {
+	collisionMap := map[Coordinate][]Identifier{}
+	for _, entity := range game.Entities {
+		positioner, ok := entity.(Positioner)
+		if !ok {
+			continue
+		}
+		position := positioner.Position()
+		collisionMap[position] = append(collisionMap[position], entity)
+	}
+	return collisionMap
 }
 
 func (game *Game) AddEntity(entity Identifier) {
