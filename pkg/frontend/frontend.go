@@ -261,7 +261,7 @@ func setupViewPort(view *View) {
 	})
 	helpText := tview.NewTextView().
 		SetTextAlign(tview.AlignCenter).
-		SetText("← → ↑ ↓ move - wasd shoot - p players - esc close - ctrl+q quit").
+		SetText("← → ↑ ↓ move - wasd shoot - p score - esc close - ctrl+q quit").
 		SetTextColor(textColor)
 	helpText.SetBackgroundColor(backgroundColor)
 	flex := tview.NewFlex().
