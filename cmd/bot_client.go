@@ -4,6 +4,7 @@ package main
 // The server has no awareness that a bot is controlling the player.
 
 import (
+	"flag"
 	"log"
 
 	"github.com/mortenson/grpc-game-example/pkg/backend"
@@ -15,12 +16,15 @@ import (
 )
 
 func main() {
+	address := flag.String("address", ":8888", "The server address.")
+	flag.Parse()
+
 	game := backend.NewGame()
 	game.IsAuthoritative = false
 	view := frontend.NewView(game)
 	game.Start()
 
-	conn, err := grpc.Dial(":8888", grpc.WithInsecure())
+	conn, err := grpc.Dial(*address, grpc.WithInsecure())
 	if err != nil {
 		log.Fatalf("can not connect with server %v", err)
 	}

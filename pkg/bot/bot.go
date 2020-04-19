@@ -1,6 +1,7 @@
 package bot
 
 import (
+	"math/rand"
 	"time"
 
 	"github.com/beefsack/go-astar"
@@ -203,6 +204,17 @@ func (bots *Bots) Start() {
 						closestPosition = position
 						move = true
 					}
+				}
+				// Randomly move to a close tile.
+				// This is pretty lazy but avoids cases where bots are locked
+				// into movement/laser loops.
+				rand.Seed(time.Now().UnixNano())
+				if move && rand.Intn(100) > 60 {
+					closestPosition = closestPosition.Add(backend.Coordinate{
+						X: rand.Intn(2) - 1,
+						Y: rand.Intn(2) - 1,
+					})
+					shoot = false
 				}
 				// Shooting takes priority over moving.
 				if shoot {
