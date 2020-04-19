@@ -10,10 +10,12 @@ type Player struct {
 	Icon            rune
 }
 
+// Position determines the player position.
 func (p *Player) Position() Coordinate {
 	return p.CurrentPosition
 }
 
+// Move moves the player.
 func (p *Player) Move(c Coordinate) {
 	p.CurrentPosition = c
 }

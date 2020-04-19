@@ -8,6 +8,7 @@ import (
 	"github.com/google/uuid"
 )
 
+// Laser is an entity that is fired by players.
 type Laser struct {
 	IdentifierBase
 	Positioner
@@ -17,6 +18,8 @@ type Laser struct {
 	OwnerID         uuid.UUID
 }
 
+// Position returns the laser position, which is calculated at runtime based on
+// when the laser was fired.
 func (laser *Laser) Position() Coordinate {
 	difference := time.Now().Sub(laser.StartTime)
 	moves := int(math.Floor(float64(difference.Milliseconds()) / float64(laserSpeed)))
@@ -34,6 +37,7 @@ func (laser *Laser) Position() Coordinate {
 	return position
 }
 
+// LaserAction is sent when a laser is fired.
 type LaserAction struct {
 	Direction Direction
 	ID        uuid.UUID
@@ -41,6 +45,7 @@ type LaserAction struct {
 	Created   time.Time
 }
 
+// Perform spawns a laser next to the player who fired it.
 func (action LaserAction) Perform(game *Game) {
 	entity := game.GetEntity(action.OwnerID)
 	if entity == nil {

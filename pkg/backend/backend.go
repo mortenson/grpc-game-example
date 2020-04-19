@@ -58,7 +58,7 @@ func (game *Game) Start() {
 	go game.watchCollisions()
 }
 
-// watchActions
+// watchActions waits for new actions to come in and performs them.
 func (game *Game) watchActions() {
 	for {
 		action := <-game.ActionChannel
@@ -71,10 +71,12 @@ func (game *Game) watchActions() {
 	}
 }
 
+// watchCollisions checks for entity collisions - al we care about now is when
+// a laser and a player collide but this could probably be more generalized.
 func (game *Game) watchCollisions() {
 	for {
 		game.Mu.Lock()
-		spawnPoints := game.GetMapSpawnPoints()
+		spawnPoints := game.GetMapByType()[MapTypeSpawn]
 		for _, entities := range game.getCollisionMap() {
 			if len(entities) <= 1 {
 				continue
@@ -107,12 +109,9 @@ func (game *Game) watchCollisions() {
 					if player.ID() == laserOwnerID {
 						continue
 					}
-					// Choose a spawn point furthest away from where the
-					// player died.
+					// Choose the next spawn point.
 					spawnPoint := spawnPoints[game.spawnPointIndex%len(spawnPoints)]
 					game.spawnPointIndex++
-					// For debugging.
-					// spawnPoint := Coordinate{X: 0, Y: 0}
 					player.Move(spawnPoint)
 					change := PlayerRespawnChange{
 						Player:     player,
@@ -134,7 +133,7 @@ func (game *Game) watchCollisions() {
 		}
 		// Remove lasers that hit walls.
 		collisionMap := game.getCollisionMap()
-		for _, wall := range game.GetMapWalls() {
+		for _, wall := range game.GetMapByType()[MapTypeWall] {
 			entities, ok := collisionMap[wall]
 			if !ok {
 				continue
@@ -155,6 +154,7 @@ func (game *Game) watchCollisions() {
 	}
 }
 
+// getCollisionMap maps coordinates to sets of entities.
 func (game *Game) getCollisionMap() map[Coordinate][]Identifier {
 	collisionMap := map[Coordinate][]Identifier{}
 	for _, entity := range game.Entities {
@@ -168,27 +168,33 @@ func (game *Game) getCollisionMap() map[Coordinate][]Identifier {
 	return collisionMap
 }
 
+// AddEntity adds an entity to the game.
 func (game *Game) AddEntity(entity Identifier) {
 	game.Entities[entity.ID()] = entity
 }
 
+// UpdateEntity updates an entity.
 func (game *Game) UpdateEntity(entity Identifier) {
 	game.Entities[entity.ID()] = entity
 }
 
+// GetEntity gets an entity from the game.
 func (game *Game) GetEntity(id uuid.UUID) Identifier {
 	return game.Entities[id]
 }
 
+// RemoveEntity removes an entity from the game.
 func (game *Game) RemoveEntity(id uuid.UUID) {
 	delete(game.Entities, id)
 }
 
+// startNewRound resets the game state in order to
+// start a new round.
 func (game *Game) startNewRound() {
 	game.WaitForRound = false
 	game.Score = map[uuid.UUID]int{}
 	i := 0
-	spawnPoints := game.GetMapSpawnPoints()
+	spawnPoints := game.GetMapByType()[MapTypeSpawn]
 	for _, entity := range game.Entities {
 		player, ok := entity.(*Player)
 		if !ok {
@@ -200,6 +206,7 @@ func (game *Game) startNewRound() {
 	game.sendChange(RoundStartChange{})
 }
 
+// queueNewRound queues a new round to start.
 func (game *Game) queueNewRound(roundWinner uuid.UUID) {
 	game.WaitForRound = true
 	game.NewRoundAt = time.Now().Add(newRoundWaitTime)
@@ -213,10 +220,12 @@ func (game *Game) queueNewRound(roundWinner uuid.UUID) {
 	}()
 }
 
+// AddScore increments an entity's score.
 func (game *Game) AddScore(id uuid.UUID) {
 	game.Score[id]++
 }
 
+// checkLastActionTime checks the last time an action was performed.
 func (game *Game) checkLastActionTime(actionKey string, created time.Time, throttle time.Duration) bool {
 	lastAction, ok := game.lastAction[actionKey]
 	if ok && lastAction.After(created.Add(-1*throttle)) {
@@ -225,10 +234,13 @@ func (game *Game) checkLastActionTime(actionKey string, created time.Time, throt
 	return true
 }
 
+// updateLastActionTime sets the last action time.
+// The actionKey should be unique to the action and the actor (entity).
 func (game *Game) updateLastActionTime(actionKey string, created time.Time) {
 	game.lastAction[actionKey] = created
 }
 
+// sendChange sends a change to the change channel.
 func (game *Game) sendChange(change Change) {
 	select {
 	case game.ChangeChannel <- change:
@@ -242,6 +254,7 @@ type Coordinate struct {
 	Y int
 }
 
+// Add adds two coordinates.
 func (c1 Coordinate) Add(c2 Coordinate) Coordinate {
 	return Coordinate{
 		X: c1.X + c2.X,
@@ -249,8 +262,9 @@ func (c1 Coordinate) Add(c2 Coordinate) Coordinate {
 	}
 }
 
-func Distance(a Coordinate, b Coordinate) int {
-	return int(math.Sqrt(math.Pow(float64(b.X-a.X), 2) + math.Pow(float64(b.Y-a.Y), 2)))
+// Distance calculates the distance between two coordinates.
+func (c1 Coordinate) Distance(c2 Coordinate) int {
+	return int(math.Sqrt(math.Pow(float64(c2.X-c1.X), 2) + math.Pow(float64(c2.Y-c1.Y), 2)))
 }
 
 // Direction is used to represent Direction constants.
@@ -265,22 +279,27 @@ const (
 	DirectionStop
 )
 
+// Identifier is an entity that provides an ID method.
 type Identifier interface {
 	ID() uuid.UUID
 }
 
+// Positioner is an entity that has a position.
 type Positioner interface {
 	Position() Coordinate
 }
 
+// Mover is an entity that can be moved.
 type Mover interface {
 	Move(Coordinate)
 }
 
+// IdentifierBase is embedded to satisfy the Identifier interface.
 type IdentifierBase struct {
 	UUID uuid.UUID
 }
 
+// ID returns the UUID of an entity.
 func (e IdentifierBase) ID() uuid.UUID {
 	return e.UUID
 }
@@ -296,24 +315,31 @@ type MoveChange struct {
 	Position  Coordinate
 }
 
+// RoundOverChange indicates that a round is over. Information about the new
+// round should be retrieved from the game instance.
 type RoundOverChange struct {
 	Change
 }
 
+// RoundStartChange indicates that a round has started.
 type RoundStartChange struct {
 	Change
 }
 
+// AddEntityChange occurs when an entity is added in response to an action.
+// Currently this is only used for new lasers and players joining the game.
 type AddEntityChange struct {
 	Change
 	Entity Identifier
 }
 
+// RemoveEntityChange occurs when an entity has been removed from the game.
 type RemoveEntityChange struct {
 	Change
 	Entity Identifier
 }
 
+// PlayerRespawnChange occurs when a player has been killed and is respawning.
 type PlayerRespawnChange struct {
 	Change
 	Player     *Player
@@ -365,7 +391,7 @@ func (action MoveAction) Perform(game *Game) {
 		position.X++
 	}
 	// Check if position collides with a wall.
-	for _, wall := range game.GetMapWalls() {
+	for _, wall := range game.GetMapByType()[MapTypeWall] {
 		if position == wall {
 			return
 		}

@@ -48,7 +48,7 @@ func (t *tile) PathNeighborCost(to astar.Pather) float64 {
 
 func (t *tile) PathEstimatedCost(to astar.Pather) float64 {
 	toT := to.(*tile)
-	return float64(backend.Distance(t.position, toT.position))
+	return float64(t.position.Distance(toT.position))
 }
 
 type bot struct {
@@ -129,9 +129,9 @@ func (bots *Bots) Start() {
 		world := &world{
 			tiles: make(map[backend.Coordinate]*tile),
 		}
-		for symbol, positions := range bots.game.GetMapSymbols() {
+		for symbol, positions := range bots.game.GetMapByType() {
 			for _, position := range positions {
-				if symbol == '█' {
+				if symbol == backend.MapTypeWall {
 					world.tiles[position] = &tile{
 						position: position,
 						world:    world,
@@ -186,7 +186,7 @@ func (bots *Bots) Start() {
 						shoot = true
 						break
 					}
-					if !move || (backend.Distance(position, playerPosition) < backend.Distance(closestPosition, playerPosition)) {
+					if !move || (position.Distance(playerPosition) < closestPosition.Distance(playerPosition)) {
 						closestPosition = position
 						move = true
 					}
