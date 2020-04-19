@@ -1,5 +1,7 @@
 package main
 
+// Runs a game server.
+
 import (
 	"flag"
 	"fmt"

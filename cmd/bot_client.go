@@ -1,5 +1,8 @@
 package main
 
+// Connects a local bot to a remote server, which is a neat demo.
+// The server has no awareness that a bot is controlling the player.
+
 import (
 	"log"
 

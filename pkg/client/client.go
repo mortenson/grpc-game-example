@@ -73,6 +73,8 @@ func (c *GameClient) Connect(grpcClient proto.GameClient, playerID uuid.UUID, pl
 	return nil
 }
 
+// Exit stops the tview application and prints a message.
+// This is needed as stdout is mangled while tview is running.
 func (c *GameClient) Exit(message string) {
 	c.View.App.Stop()
 	log.Println(message)

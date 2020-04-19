@@ -206,7 +206,7 @@ func setupViewPort(view *View) {
 			screen.SetContent(drawX, drawY, icon, nil, style.Foreground(color))
 		}
 		// Draw map
-		for _, wall := range view.Game.GetMapWalls() {
+		for _, wall := range view.Game.GetMapByType()[backend.MapTypeWall] {
 			x := centerX + wall.X
 			y := centerY + wall.Y
 			if !withinDrawBounds(x, y, width, height) {

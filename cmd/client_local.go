@@ -1,5 +1,7 @@
 package main
 
+// Starts a local instance of the game with bots.
+
 import (
 	"flag"
 	"fmt"

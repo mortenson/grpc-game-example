@@ -174,7 +174,7 @@ func (s *GameServer) Connect(ctx context.Context, req *proto.ConnectRequest) (*p
 	icon, _ := utf8.DecodeRuneInString(strings.ToUpper(req.Name))
 
 	// Choose a random spawn point.
-	spawnPoints := s.game.GetMapSpawnPoints()
+	spawnPoints := s.game.GetMapByType()[backend.MapTypeSpawn]
 	rand.Seed(time.Now().Unix())
 	i := rand.Int() % len(spawnPoints)
 	startCoordinate := spawnPoints[i]

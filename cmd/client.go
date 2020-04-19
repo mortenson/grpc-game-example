@@ -1,5 +1,7 @@
 package main
 
+// Connects to a server for play.
+
 import (
 	"log"
 	"regexp"
@@ -26,6 +28,10 @@ type connectInfo struct {
 	Password   string
 }
 
+// It feels wrong to have this much frontend code in a command file, but this
+// is done as the frontend package has no awareness of the client/server model,
+// and as a result should not have UIs like this.
+// Maybe, if anything, it shows how you can compose tview applications?
 func connectApp(info *connectInfo) *tview.Application {
 	app := tview.NewApplication()
 	flex := tview.NewFlex().
