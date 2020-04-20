@@ -1,7 +1,7 @@
 .PHONY: run run-client run-client-local run-server proto fmt
 build:
 	mkdir -p bin
-	GOOS=windows GOARCH=amd64 go build -ldflags "-s -w" -o "bin/tshooter_client_win${BUILD_SUFFIX}.exe" cmd/client.go
+	GOOS=windows GOARCH=amd64 go build -ldflags "-s -w" -o "bin/tshooter_win_client${BUILD_SUFFIX}.exe" cmd/client.go
 	GOOS=windows GOARCH=amd64 go build -ldflags "-s -w" -o "bin/tshooter_win_server${BUILD_SUFFIX}.exe" cmd/server.go
 	GOOS=windows GOARCH=amd64 go build -ldflags "-s -w" -o "bin/tshooter_win_client_local${BUILD_SUFFIX}.exe" cmd/client_local.go
 	GOOS=linux GOARCH=amd64 go build -ldflags "-s -w" -o "bin/tshooter_lin_client${BUILD_SUFFIX}" cmd/client.go
