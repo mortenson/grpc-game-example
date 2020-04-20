@@ -9,10 +9,12 @@ language for that long so don't judge the code too harshly!
 
 ## Game description
 
-The game is "tshooter", an offline or multiplayer shooter you play on your
-terminal. You move with the arrow keys and shoot lasers with the WASD keys.
-When a player gets 10 kills, the round ends and a new round begins. Bots and a
-maximum of eight players are supported
+This is “tshooter” - a local or online multiplayer shooting game you play
+in your terminal. Players can move in a map and fire lasers at other players.
+When a player is hit, they respawn on the map and the shooting player’s score
+is increased. When a player reaches 10 kills, the round ends and a new round
+begins. You can play the game offline with bots, or online with up to eight
+players (but that limit is arbitrary).
 
 ## Reference and use
 
