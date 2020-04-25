@@ -68,10 +68,10 @@ type tile struct {
 func (t *tile) PathNeighbors() []astar.Pather {
 	neighbors := []astar.Pather{}
 	for _, difference := range []backend.Coordinate{
-		backend.Coordinate{X: -1, Y: 0},
-		backend.Coordinate{X: 1, Y: 0},
-		backend.Coordinate{X: 0, Y: -1},
-		backend.Coordinate{X: 0, Y: 1},
+		{X: -1, Y: 0},
+		{X: 1, Y: 0},
+		{X: 0, Y: -1},
+		{X: 0, Y: 1},
 	} {
 		position := t.position.Add(difference)
 		neighbor, ok := t.world.tiles[position]

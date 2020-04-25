@@ -50,3 +50,9 @@ go run cmd/client_local.go -bots=2
 # Run a bot as a client
 go run cmd/bot_client.go -address=":9999"
 ```
+
+# Using binaries
+
+Using `make`, binaries are output to the `bin` directory in the format
+`tshooter_ARCH_COMMAND`. For ease of use, "launcher" binaries are also
+generated which can be double clicked to open a terminal window.

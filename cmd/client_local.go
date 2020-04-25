@@ -6,14 +6,21 @@ import (
 	"flag"
 	"fmt"
 	"log"
+	"os"
 
+	termutil "github.com/andrew-d/go-termutil"
 	"github.com/google/uuid"
+
 	"github.com/mortenson/grpc-game-example/pkg/backend"
 	"github.com/mortenson/grpc-game-example/pkg/bot"
 	"github.com/mortenson/grpc-game-example/pkg/frontend"
 )
 
 func main() {
+	if !termutil.Isatty(os.Stdin.Fd()) {
+		panic("this program must be run in a terminal")
+	}
+
 	numBots := flag.Int("bots", 1, "The number of bots to play against.")
 	flag.Parse()
 
