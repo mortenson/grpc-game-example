@@ -1,4 +1,4 @@
-.PHONY: build run run-client run-client-local run-server proto fmt
+.PHONY: build run run-client run-client-local run-server proto fmt release
 build:
 	# Linux
 	for command in client_local client server; do \
@@ -16,6 +16,12 @@ build:
 		GOOS=windows GOARCH=amd64 go build -ldflags "-s -w" -o "bin/tshooter_windows_$${command}.exe" "cmd/$${command}.go"; \
 		GOOS=windows GOARCH=amd64 go build -ldflags "-s -w -X main.Command=$${command}.exe" -o "bin/tshooter_windows_launcher_$${command}.exe" cmd/launcher.go; \
 	done
+release:
+	cp assets/README.txt bin/
+	cd bin && \
+	zip tshooter_windows README.txt *_windows_* && \
+	zip tshooter_linux README.txt *_linux_* && \
+	zip tshooter_darwin README.txt *_darwin_*
 run-client-local:
 run:
 	go run cmd/client_local.go
